@@ -27,7 +27,15 @@ export default function Dashboard({
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <h1>Job Dashboard</h1>
+        <div>
+          <h1>Job Dashboard</h1>
+          <p style={{ color: 'var(--color-text-tertiary)', fontSize: '0.875rem', margin: '0.5rem 0 0 0' }}>
+            Track and manage your job applications
+          </p>
+        </div>
+      </div>
+      
+      <div className="dashboard-stats-section">
         <div className="dashboard-stats">
           <div className="stat-card">
             <div className="stat-number">{jobQueue.length}</div>
