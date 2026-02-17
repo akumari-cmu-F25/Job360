@@ -286,6 +286,206 @@ async def process_voice_instruction(request: VoiceInstructionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/linkedin/generate-message")
+async def generate_linkedin_message(request: Dict[str, Any]):
+    """Generate personalized LinkedIn referral message."""
+    try:
+        job = request.get('job', {})
+        profile_data = request.get('profile', {})
+        tone = request.get('tone', 'professional')
+        
+        if not job or not profile_data:
+            raise HTTPException(status_code=400, detail="Job and profile data required")
+        
+        profile = Profile(**profile_data)
+        
+        # Generate message based on tone
+        job_title = job.get('title', 'this position')
+        company = job.get('company', 'your company')
+        
+        # Get relevant experience and skills
+        experience_title = profile.experiences[0].title if profile.experiences else 'software development'
+        top_skills = ', '.join([s.name for s in profile.skills[:3]]) if profile.skills else 'relevant technologies'
+        
+        if tone == 'professional':
+            message = f"""Hi [Name],
+
+I hope this message finds you well. I noticed that {company} is hiring for the {job_title} position, and I am very interested in this opportunity.
+
+With my background in {experience_title} and expertise in {top_skills}, I believe I would be a strong fit for this role and could contribute meaningfully to the team.
+
+I would greatly appreciate it if you could refer me for this position or connect me with the hiring manager. I have attached my resume and would be happy to discuss how my skills and experience align with the team's needs.
+
+Thank you for considering my request. I look forward to the possibility of working together.
+
+Best regards,
+{profile.name or 'Your Name'}"""
+        
+        elif tone == 'friendly':
+            message = f"""Hey [Name]!
+
+Hope you're doing well! I saw that {company} is looking for a {job_title}, and I'm really excited about this opportunity.
+
+I've been working in {experience_title} and have experience with {top_skills}. I think I'd be a great fit for the role and would love to be part of the team!
+
+Would you be able to refer me or point me in the right direction? I'd really appreciate any help you can offer. Happy to chat more about it if you'd like!
+
+Thanks so much!
+{profile.name or 'Your Name'}"""
+        
+        else:  # concise
+            message = f"""Hi [Name],
+
+I'm interested in the {job_title} role at {company}. With my experience in {experience_title} and {top_skills}, I believe I'd be a strong candidate.
+
+Would you be able to refer me or connect me with the hiring team?
+
+Thanks,
+{profile.name or 'Your Name'}"""
+        
+        return {
+            "success": True,
+            "message": message
+        }
+    
+    except Exception as e:
+        logger.error(f"Error generating LinkedIn message: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/interview/prep-plan")
+async def generate_interview_prep(request: Dict[str, Any]):
+    """Generate interview preparation plan with hardcoded problems."""
+    try:
+        job = request.get('job', {})
+        
+        if not job:
+            raise HTTPException(status_code=400, detail="Job data required")
+        
+        # Return hardcoded prep plan (frontend has default, but backend can customize)
+        prep_plan = {
+            "leetcode_problems": [
+                {
+                    "title": "Two Sum",
+                    "difficulty": "Easy",
+                    "topic": "Arrays & Hashing",
+                    "url": "https://leetcode.com/problems/two-sum/",
+                    "priority": "High"
+                },
+                {
+                    "title": "Valid Parentheses",
+                    "difficulty": "Easy",
+                    "topic": "Stack",
+                    "url": "https://leetcode.com/problems/valid-parentheses/",
+                    "priority": "High"
+                },
+                {
+                    "title": "Merge Two Sorted Lists",
+                    "difficulty": "Easy",
+                    "topic": "Linked List",
+                    "url": "https://leetcode.com/problems/merge-two-sorted-lists/",
+                    "priority": "Medium"
+                },
+                {
+                    "title": "Binary Search",
+                    "difficulty": "Easy",
+                    "topic": "Binary Search",
+                    "url": "https://leetcode.com/problems/binary-search/",
+                    "priority": "High"
+                },
+                {
+                    "title": "Best Time to Buy and Sell Stock",
+                    "difficulty": "Easy",
+                    "topic": "Arrays",
+                    "url": "https://leetcode.com/problems/best-time-to-buy-and-sell-stock/",
+                    "priority": "High"
+                },
+                {
+                    "title": "Longest Substring Without Repeating Characters",
+                    "difficulty": "Medium",
+                    "topic": "Sliding Window",
+                    "url": "https://leetcode.com/problems/longest-substring-without-repeating-characters/",
+                    "priority": "High"
+                },
+                {
+                    "title": "Product of Array Except Self",
+                    "difficulty": "Medium",
+                    "topic": "Arrays",
+                    "url": "https://leetcode.com/problems/product-of-array-except-self/",
+                    "priority": "High"
+                },
+                {
+                    "title": "LRU Cache",
+                    "difficulty": "Medium",
+                    "topic": "Design",
+                    "url": "https://leetcode.com/problems/lru-cache/",
+                    "priority": "High"
+                }
+            ],
+            "system_design_topics": [
+                {
+                    "title": "System Design Fundamentals",
+                    "description": "Understanding scalability, load balancing, caching, and database sharding",
+                    "resources": [
+                        "System Design Primer (GitHub)",
+                        "Designing Data-Intensive Applications (Book)",
+                        "Grokking System Design Interview"
+                    ],
+                    "estimatedTime": "2-3 weeks"
+                },
+                {
+                    "title": "Design URL Shortener",
+                    "description": "Classic system design problem covering hashing, database design, and scaling",
+                    "resources": [
+                        "System Design Interview - URL Shortener",
+                        "YouTube: System Design URL Shortener"
+                    ],
+                    "estimatedTime": "3-4 hours"
+                },
+                {
+                    "title": "Design Social Media Feed",
+                    "description": "Learn about fan-out, caching strategies, and real-time updates",
+                    "resources": [
+                        "Designing Instagram/Twitter Feed",
+                        "System Design: News Feed"
+                    ],
+                    "estimatedTime": "4-5 hours"
+                },
+                {
+                    "title": "Design Rate Limiter",
+                    "description": "Understanding API rate limiting, token bucket, and distributed systems",
+                    "resources": [
+                        "Rate Limiting Algorithms",
+                        "System Design: API Rate Limiter"
+                    ],
+                    "estimatedTime": "2-3 hours"
+                }
+            ],
+            "behavioral_questions": [
+                "Tell me about a time you faced a challenging technical problem. How did you solve it?",
+                "Describe a situation where you had to work with a difficult team member.",
+                "Tell me about a project you're most proud of and why.",
+                "How do you handle tight deadlines and pressure?",
+                "Describe a time when you had to learn a new technology quickly.",
+                "Tell me about a time you made a mistake. How did you handle it?",
+                "How do you prioritize tasks when working on multiple projects?",
+                "Describe a situation where you had to give constructive feedback to a colleague.",
+                "Tell me about a time you disagreed with a technical decision. What did you do?",
+                "How do you stay updated with new technologies and industry trends?"
+            ],
+            "timeline": "4-6 weeks of focused preparation"
+        }
+        
+        return {
+            "success": True,
+            "plan": prep_plan
+        }
+    
+    except Exception as e:
+        logger.error(f"Error generating interview prep: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

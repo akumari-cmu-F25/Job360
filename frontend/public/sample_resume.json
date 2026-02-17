@@ -1,0 +1,100 @@
+{
+  "name": "Anand Behara",
+  "email": "abehara@andrew.cmu.edu",
+  "phone": "650-669-9014",
+  "location": "San Francisco Bay Area",
+  "summary": "Software Engineer with expertise in full-stack development, distributed systems, and AI/ML applications. Experienced in building scalable systems and real-time applications.",
+  "experiences": [
+    {
+      "title": "Research Assistant",
+      "company": "Carnegie Mellon University - Dept. of Electrical and Computer Engineering",
+      "location": "Silicon Valley, CA",
+      "start_date": "Jan 2026",
+      "end_date": "Present",
+      "bullets": [
+        "Architected and deployed an end-to-end real-time ASL recognition system for Apple Vision Pro, integrating data ingestion, model serving, and on-device inference to support 200+ FPS hand-tracking input with sub-20ms end-to-end on-device inference latency",
+        "Developed a SwiftUI-based data collection app with real-time hand tracking (100+ features per frame), cloud-backed storage, and deterministic dataset generation, which streamlined data acquisition for model training and reduced preprocessing effort",
+        "Built a modular training and deployment pipeline in Python using PyTorch and CoreML, enabling reproducible experiments, automated model versioning, model artifact management, and low-latency visionOS inference across iterative deployment cycles",
+        "Prototyped an automated programming assignment grader as an IntelliJ plugin, combining dynamic code analysis with backend services to deliver structured, actionable feedback at scale across diverse student programming submissions at university scale",
+        "Implemented a containerized RESTful service with tRPC in Docker to execute unit-test-based code evaluation, publishing results asynchronously for downstream consumption, which reduced grading latency and improved reliability of the evaluation pipeline"
+      ],
+      "technologies": ["Python", "PyTorch", "CoreML", "SwiftUI", "Docker", "tRPC"]
+    },
+    {
+      "title": "Full Stack Engineer Intern",
+      "company": "Stealth AI Startup",
+      "location": "Mountain View, CA",
+      "start_date": "Sep 2025",
+      "end_date": "Present",
+      "bullets": [
+        "Designed and implemented a type-safe full-stack architecture with TypeScript, Next.js, tRPC, Prisma, and PostgreSQL, enabling secure draft-based workflows for AI-assisted police report submission and improving data integrity through strict schema enforcement",
+        "Integrated GPT-4–powered dynamic form generation with streaming responses, schema validation (Zod), and LiveKit-based speech-to-text pipelines to streamline report filing, reducing completion time by 30% across 25+ dynamic form fields in production"
+      ],
+      "technologies": ["TypeScript", "Next.js", "tRPC", "Prisma", "PostgreSQL", "GPT-4", "Zod", "LiveKit"]
+    },
+    {
+      "title": "Software Engineer Intern (R&D)",
+      "company": "CyberArk",
+      "location": "Hyderabad, India",
+      "start_date": "Jun 2024",
+      "end_date": "Dec 2024",
+      "bullets": [
+        "Developed a feature-flag management platform using Golang, Angular, and PostgreSQL, reducing deployment turnaround time by 25% by enabling independent feature toggling for DevOps teams across multiple internal services and deployment environments",
+        "Integrated real-time API metrics and audit logging for over 80 internal services, improving system uptime by 25% for Flows team by eliminating manual release dependencies"
+      ],
+      "technologies": ["Golang", "Angular", "PostgreSQL"]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Master of Science, Software Engineering",
+      "institution": "Carnegie Mellon University",
+      "location": "Pittsburgh, PA",
+      "graduation_date": "Dec 2026",
+      "field_of_study": "Software Engineering"
+    },
+    {
+      "degree": "Bachelor of Science, Computer Science and Engineering",
+      "institution": "Chaitanya Bharathi Institute of Technology",
+      "location": "Hyderabad, India",
+      "graduation_date": "Apr 2025",
+      "field_of_study": "Computer Science and Engineering"
+    }
+  ],
+  "skills": [
+    { "name": "Python" },
+    { "name": "TypeScript" },
+    { "name": "Golang" },
+    { "name": "SQL" },
+    { "name": "C++" },
+    { "name": "Swift" },
+    { "name": "React" },
+    { "name": "Next.js" },
+    { "name": "Node.js" },
+    { "name": "Flask" },
+    { "name": "Prisma" },
+    { "name": "tRPC" },
+    { "name": "Docker" },
+    { "name": "PostgreSQL" },
+    { "name": "MongoDB" },
+    { "name": "PyTorch" }
+  ],
+  "projects": [
+    {
+      "name": "Emergency Social Network",
+      "description": "Real-time emergency response platform",
+      "bullets": [
+        "Engineered a real-time emergency response platform using TypeScript/Express/MongoDB/Socket.io stack with MapboxGL integration, featuring live user presence, chat rooms, and broadcast status using along with 434 unit tests under simulated load"
+      ],
+      "technologies": ["TypeScript", "Express", "MongoDB", "Socket.io", "MapboxGL"]
+    },
+    {
+      "name": "Old Souls Website",
+      "description": "Senior pet adoption platform",
+      "bullets": [
+        "Engineered a Next.js 15 / React 18 web platform using shadcn/ui and TailwindCSS, delivering responsive, accessible user flows and interactive form-driven experiences for senior pet adoption with planned donation portal and secure payment integration"
+      ],
+      "technologies": ["Next.js", "React", "shadcn/ui", "TailwindCSS"]
+    }
+  ]
+}

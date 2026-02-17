@@ -1,4 +1,4 @@
-"""Test script to verify rewrite agent logic - checks if it identifies all sections."""
+pip install -r requirements.txt"""Test script to verify rewrite agent logic - checks if it identifies all sections."""
 
 import sys
 from pathlib import Path

@@ -54,6 +54,24 @@ export const api = {
     })
     return response.data
   },
+
+  // LinkedIn referral message
+  generateLinkedInMessage: async (job: any, profile: any, tone: string) => {
+    const response = await client.post('/api/linkedin/generate-message', {
+      job,
+      profile,
+      tone,
+    })
+    return response.data
+  },
+
+  // Interview prep
+  generateInterviewPrep: async (job: any) => {
+    const response = await client.post('/api/interview/prep-plan', {
+      job,
+    })
+    return response.data
+  },
 }
 
 export default api
