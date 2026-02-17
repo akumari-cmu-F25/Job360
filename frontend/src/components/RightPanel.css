@@ -1,0 +1,203 @@
+.right-panel {
+  width: 60%;
+  background: #f8f9fa;
+  padding: 1.5rem;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1a202c;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.current-job-info {
+  background: #fafafa;
+  border-left: 2px solid #4a5568;
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  color: #2d3748;
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+.current-job-info.processing {
+  border-left-color: #2d3748;
+}
+
+.current-job-info.completed {
+  border-left-color: #cbd5e0;
+  opacity: 0.8;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.resume-preview {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+  overflow-y: auto;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #718096;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.resume-content {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  color: #2d3748;
+}
+
+.resume-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.resume-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: #1a202c;
+}
+
+.contact-info {
+  color: #718096;
+  font-size: 0.875rem;
+}
+
+.resume-section {
+  margin-bottom: 1.5rem;
+}
+
+.resume-section h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.25rem;
+}
+
+.experience-item,
+.education-item,
+.project-item {
+  margin-bottom: 1.25rem;
+}
+
+.experience-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.25rem;
+}
+
+.experience-header strong {
+  font-size: 0.9375rem;
+  color: #1a202c;
+}
+
+.experience-header span {
+  color: #718096;
+  font-size: 0.8125rem;
+}
+
+.experience-company {
+  color: #4a5568;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.resume-section ul {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #4a5568;
+  font-size: 0.875rem;
+}
+
+.resume-section li {
+  margin-bottom: 0.5rem;
+}
+
+.edit-highlight {
+  background: #f0f4f8;
+  padding: 0.15rem 0.3rem;
+  border-left: 2px solid #4a5568;
+  border-radius: 2px;
+  margin: 0.15rem 0;
+}
+
+.technologies {
+  color: #718096;
+  font-size: 0.8125rem;
+  font-style: italic;
+  margin-top: 0.5rem;
+}
+
+.skills-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.skill-item {
+  background: #f7fafc;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #4a5568;
+}
+
+.skill-item.edit-highlight {
+  background: #f0f4f8;
+  border-left: 2px solid #4a5568;
+  font-weight: 500;
+}
+
+.action-buttons {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.download-button {
+  width: 100%;
+  padding: 0.625rem;
+  background: #1a202c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.download-button:hover {
+  background: #2d3748;
+}
