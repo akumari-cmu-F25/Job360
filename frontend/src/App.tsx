@@ -20,10 +20,16 @@ function App() {
   const [currentView, setCurrentView] = useState<View>('launch')
   const [selectedJobForLinkedIn, setSelectedJobForLinkedIn] = useState<Job | null>(null)
   const [selectedJobForPrep, setSelectedJobForPrep] = useState<Job | null>(null)
+  const [initialCategory, setInitialCategory] = useState<string>('')
 
   const handleEditResume = (job: Job) => {
     const jobIndex = jobQueue.findIndex((j) => j.url === job.url)
     if (jobIndex >= 0) {
+      // Reset job status to 'queued' so it can be re-processed
+      const updatedQueue = [...jobQueue]
+      updatedQueue[jobIndex] = { ...job, status: 'queued' }
+      setJobQueue(updatedQueue)
+
       setCurrentJobIndex(jobIndex)
       if (job.edited_profile) {
         setEditedProfile(job.edited_profile)
@@ -36,6 +42,7 @@ function App() {
     setProfile(uploadedProfile)
     setOriginalProfile(uploadedProfile)
     setEditedProfile(uploadedProfile)
+    setInitialCategory(category)
     setCurrentView('editor')
   }
 
@@ -86,9 +93,11 @@ function App() {
             currentJobIndex={currentJobIndex}
             onCurrentJobIndexChange={setCurrentJobIndex}
             onResumeEdited={setEditedProfile}
+            initialCategory={initialCategory}
+            onInitialCategoryUsed={() => setInitialCategory('')}
           />
           <RightPanel
-            profile={editedProfile || profile}
+            profile={profile}
             originalProfile={originalProfile}
             currentJob={currentJobIndex >= 0 ? jobQueue[currentJobIndex] : null}
             jobQueue={jobQueue}

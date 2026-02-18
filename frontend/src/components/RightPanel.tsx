@@ -19,11 +19,14 @@ export default function RightPanel({
   onCurrentJobIndexChange,
   onJobQueueChange,
 }: RightPanelProps) {
+  // Use the job's edited_profile if available, otherwise use the passed profile
+  const displayProfile = currentJob?.edited_profile || profile
+
   const handleDownload = async () => {
-    if (!profile) return
+    if (!displayProfile) return
 
     try {
-      const result = await api.exportResume(profile)
+      const result = await api.exportResume(displayProfile)
       // Convert hex to blob and download
       const hex = result.file
       const bytes = new Uint8Array(hex.match(/.{1,2}/g)!.map((byte: string) => parseInt(byte, 16)))
@@ -46,10 +49,20 @@ export default function RightPanel({
 
   const handleAcceptChanges = () => {
     if (!currentJob) return
-    // Remove the job from the queue
-    const updatedQueue = jobQueue.filter((j) => j.url !== currentJob.url)
+    // Mark the job as accepted
+    const updatedQueue = jobQueue.map((j) =>
+      j.url === currentJob.url ? { ...j, accepted: true } : j
+    )
     onJobQueueChange(updatedQueue)
-    onCurrentJobIndexChange(-1)
+  }
+
+  const handleRejectChanges = () => {
+    if (!currentJob) return
+    // Revert the job back to queued status and clear edited_profile
+    const updatedQueue = jobQueue.map((j) =>
+      j.url === currentJob.url ? { ...j, status: 'queued' as const, edited_profile: undefined } : j
+    )
+    onJobQueueChange(updatedQueue)
   }
 
   if (!profile) {
@@ -107,50 +120,69 @@ export default function RightPanel({
         </div>
       )}
 
-      {currentJob && currentJob.status === 'completed' && originalProfile && profile && (
-        <div className="changes-summary">
-          <strong>Changes Made:</strong>
-          <ul>
-            {originalProfile.summary !== profile.summary && <li>✓ Professional summary updated</li>}
-            {profile.experiences &&
-              originalProfile.experiences &&
-              profile.experiences.length > originalProfile.experiences.length && (
-                <li>
-                  ✓ Added {profile.experiences.length - originalProfile.experiences.length}{' '}
-                  experience(s)
-                </li>
+      {currentJob &&
+        currentJob.status === 'completed' &&
+        !currentJob.accepted &&
+        originalProfile &&
+        profile && (
+          <div className="changes-summary">
+            <strong>Changes Made:</strong>
+            <ul>
+              {originalProfile.summary !== profile.summary && (
+                <li>✓ Professional summary updated</li>
               )}
-            {profile.skills &&
-              originalProfile.skills &&
-              profile.skills.length > originalProfile.skills.length && (
-                <li>✓ Added {profile.skills.length - originalProfile.skills.length} skill(s)</li>
-              )}
-            {profile.experiences &&
-              originalProfile.experiences &&
-              profile.experiences.some((exp, i) => {
-                const origExp = originalProfile.experiences?.[i]
-                return (
-                  origExp &&
-                  exp.bullets &&
-                  origExp.bullets &&
-                  exp.bullets.some((b, j) => origExp.bullets?.[j] !== b)
-                )
-              }) && <li>✓ Rewrote experience bullets</li>}
-          </ul>
-        </div>
-      )}
+              {profile.experiences &&
+                originalProfile.experiences &&
+                profile.experiences.length > originalProfile.experiences.length && (
+                  <li>
+                    ✓ Added {profile.experiences.length - originalProfile.experiences.length}{' '}
+                    experience(s)
+                  </li>
+                )}
+              {profile.skills &&
+                originalProfile.skills &&
+                profile.skills.length > originalProfile.skills.length && (
+                  <li>✓ Added {profile.skills.length - originalProfile.skills.length} skill(s)</li>
+                )}
+              {profile.experiences &&
+                originalProfile.experiences &&
+                profile.experiences.some((exp, i) => {
+                  const origExp = originalProfile.experiences?.[i]
+                  return (
+                    origExp &&
+                    exp.bullets &&
+                    origExp.bullets &&
+                    exp.bullets.some((b, j) => origExp.bullets?.[j] !== b)
+                  )
+                }) && <li>✓ Rewrote experience bullets</li>}
+            </ul>
+          </div>
+        )}
 
       <div className="resume-preview">
-        <ResumeContent profile={profile} originalProfile={originalProfile} />
+        {displayProfile && (
+          <ResumeContent profile={displayProfile} originalProfile={originalProfile} />
+        )}
       </div>
 
-      {currentJob && currentJob.status === 'completed' && (
+      {currentJob && currentJob.status === 'completed' && !currentJob.accepted && (
         <div className="action-buttons">
           <button onClick={handleDownload} className="download-button">
             Download
           </button>
           <button onClick={handleAcceptChanges} className="accept-button">
             Accept Changes
+          </button>
+          <button onClick={handleRejectChanges} className="reject-button">
+            Reject Changes
+          </button>
+        </div>
+      )}
+
+      {currentJob && currentJob.status === 'completed' && currentJob.accepted && (
+        <div className="action-buttons">
+          <button onClick={handleDownload} className="download-button">
+            Download
           </button>
         </div>
       )}

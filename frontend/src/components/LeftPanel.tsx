@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Profile, Job } from '../types'
 import { api } from '../api/client'
@@ -15,6 +15,8 @@ interface LeftPanelProps {
   currentJobIndex: number
   onCurrentJobIndexChange: (index: number) => void
   onResumeEdited: (profile: Profile) => void
+  initialCategory?: string
+  onInitialCategoryUsed?: () => void
 }
 
 const categories = ['ML', 'SWE', 'SDE', 'Product', 'Data Analytics', 'Data', 'AI']
@@ -41,6 +43,8 @@ export default function LeftPanel({
   currentJobIndex,
   onCurrentJobIndexChange,
   onResumeEdited,
+  initialCategory = '',
+  onInitialCategoryUsed,
 }: LeftPanelProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [jdUrl, setJdUrl] = useState<string>('')
@@ -51,6 +55,22 @@ export default function LeftPanel({
   const [activeTab, setActiveTab] = useState<'upload' | 'search' | 'queue'>('upload')
   const [isProcessing, setIsProcessing] = useState(false)
   const [resumeFileName, setResumeFileName] = useState<string>('')
+
+  // Auto-search when initialCategory is provided from launch page
+  useEffect(() => {
+    if (initialCategory && !searching && selectedCategory === '') {
+      setSelectedCategory(initialCategory)
+      setActiveTab('search')
+      onInitialCategoryUsed?.()
+    }
+  }, [initialCategory, onInitialCategoryUsed, searching, selectedCategory])
+
+  // Trigger search when selectedCategory is set from initialCategory
+  useEffect(() => {
+    if (selectedCategory && activeTab === 'search' && !searching && jobListings.length === 0) {
+      handleSearchJobs()
+    }
+  }, [selectedCategory, activeTab, searching, jobListings.length])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -140,30 +160,35 @@ export default function LeftPanel({
   const handleApplyToAll = async () => {
     if (jobQueue.length === 0 || !profile) return
 
+    // Filter to only process queued jobs, skip completed ones
+    const queuedJobs = jobQueue.filter((job) => job.status === 'queued' || !job.status)
+    if (queuedJobs.length === 0) return
+
     setIsProcessing(true)
-    onCurrentJobIndexChange(0)
-    processNextJobById(jobQueue.map((j) => j.id!).filter((id) => id))
+    // Find the index of the first queued job
+    const firstQueuedIndex = jobQueue.findIndex((job) => job.status === 'queued' || !job.status)
+    onCurrentJobIndexChange(firstQueuedIndex)
+    processNextJob(jobQueue, firstQueuedIndex)
   }
 
-  const processNextJobById = async (jobIds: string[]) => {
-    if (jobIds.length === 0) {
+  const processNextJob = async (currentQueue: Job[], jobIndex: number) => {
+    if (jobIndex >= currentQueue.length) {
       // All jobs processed, reset current job index and processing flag
       onCurrentJobIndexChange(-1)
       setIsProcessing(false)
       return
     }
 
-    const jobIdToProcess = jobIds[0]
-    const currentQueue = jobQueue
-    const jobIndex = currentQueue.findIndex((j) => j.id === jobIdToProcess)
+    const job = currentQueue[jobIndex]
 
-    // Job was removed from queue, skip it
-    if (jobIndex === -1) {
-      processNextJobById(jobIds.slice(1))
+    // Skip completed jobs, move to next
+    if (job.status === 'completed') {
+      setTimeout(() => {
+        processNextJob(currentQueue, jobIndex + 1)
+      }, 0)
       return
     }
 
-    const job = currentQueue[jobIndex]
     const updatedQueue = [...currentQueue]
     updatedQueue[jobIndex] = { ...job, status: 'processing' }
     onJobQueueChange(updatedQueue)
@@ -184,14 +209,14 @@ export default function LeftPanel({
 
         // Process next job after a short delay
         setTimeout(() => {
-          processNextJobById(jobIds.slice(1))
+          processNextJob(updatedQueue, jobIndex + 1)
         }, 2000)
       } else {
         updatedQueue[jobIndex] = { ...job, status: 'error' }
         onJobQueueChange(updatedQueue)
         // Continue to next job even if this one failed
         setTimeout(() => {
-          processNextJobById(jobIds.slice(1))
+          processNextJob(updatedQueue, jobIndex + 1)
         }, 1000)
       }
     } catch (error) {
@@ -200,7 +225,7 @@ export default function LeftPanel({
       onJobQueueChange(updatedQueue)
       // Continue to next job even if this one failed
       setTimeout(() => {
-        processNextJobById(jobIds.slice(1))
+        processNextJob(updatedQueue, jobIndex + 1)
       }, 1000)
     }
   }
@@ -368,6 +393,28 @@ export default function LeftPanel({
                       key={index}
                       className={`queue-item ${job.status || 'queued'} ${index === currentJobIndex ? 'current' : ''}`}
                     >
+                      <div className="queue-item-status-icon">
+                        {job.status === 'processing' && (
+                          <div className="spinner-icon" title="Processing...">
+                            ⏳
+                          </div>
+                        )}
+                        {job.status === 'completed' && (
+                          <div className="checkmark-icon" title="Completed">
+                            ✓
+                          </div>
+                        )}
+                        {job.status === 'error' && (
+                          <div className="error-icon" title="Error">
+                            ✕
+                          </div>
+                        )}
+                        {(job.status === 'queued' || !job.status) && (
+                          <div className="queued-icon" title="Queued">
+                            ○
+                          </div>
+                        )}
+                      </div>
                       <div
                         className="queue-item-content"
                         onClick={() => onCurrentJobIndexChange(index)}
@@ -381,27 +428,46 @@ export default function LeftPanel({
                       >
                         <div className="queue-job-title">{job.title}</div>
                         <div className="queue-job-company">{job.company}</div>
-                        <div className="queue-status">
-                          {job.status || 'queued'}
-                          {index === currentJobIndex && job.status === 'processing' && (
-                            <span className="processing-indicator"> Processing...</span>
-                          )}
+                        <div className="queue-job-status">
+                          {job.status === 'processing'
+                            ? 'Processing'
+                            : job.status === 'completed'
+                              ? 'Completed'
+                              : job.status === 'error'
+                                ? 'Error'
+                                : 'Queued'}
                         </div>
                       </div>
-                      <button
-                        className="queue-remove-btn"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const updatedQueue = jobQueue.filter((_, i) => i !== index)
-                          onJobQueueChange(updatedQueue)
-                          if (currentJobIndex === index) {
-                            onCurrentJobIndexChange(-1)
-                          }
-                        }}
-                        title="Remove from queue"
-                      >
-                        ✕
-                      </button>
+                      <div className="queue-item-actions">
+                        {job.status === 'error' && (
+                          <button
+                            className="queue-retry-btn"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const updatedQueue = [...jobQueue]
+                              updatedQueue[index] = { ...job, status: 'queued' }
+                              onJobQueueChange(updatedQueue)
+                            }}
+                            title="Retry processing this job"
+                          >
+                            ↻
+                          </button>
+                        )}
+                        <button
+                          className="queue-remove-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const updatedQueue = jobQueue.filter((_, i) => i !== index)
+                            onJobQueueChange(updatedQueue)
+                            if (currentJobIndex === index) {
+                              onCurrentJobIndexChange(-1)
+                            }
+                          }}
+                          title="Remove from queue"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
