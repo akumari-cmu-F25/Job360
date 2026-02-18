@@ -25,8 +25,12 @@ from src.utils.resume_exporter import ResumeExporter
 from src.utils.job_fetcher import JobFetcher
 from src.agents.profile_parser.profile_models import Profile
 from src.agents.job_understanding.jd_models import JobDescription
+from src.config import config
+from openai import OpenAI
 import tempfile
 import os
+
+openai_client = OpenAI(api_key=config.openai_api_key)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -400,22 +404,55 @@ async def generate_linkedin_message(request: Dict[str, Any]):
         job = request.get('job', {})
         profile_data = request.get('profile', {})
         tone = request.get('tone', 'professional')
-        
+        custom_requirements = request.get('custom_requirements', '').strip()
+
         if not job or not profile_data:
             raise HTTPException(status_code=400, detail="Job and profile data required")
-        
+
         profile = Profile(**profile_data)
-        
-        # Generate message based on tone
+
         job_title = job.get('title', 'this position')
         company = job.get('company', 'your company')
-        
-        # Get relevant experience and skills
         experience_title = profile.experiences[0].title if profile.experiences else 'software development'
-        top_skills = ', '.join([s.name for s in profile.skills[:3]]) if profile.skills else 'relevant technologies'
-        
-        if tone == 'professional':
-            message = f"""Hi [Name],
+        top_skills = ', '.join([s.name for s in profile.skills[:5]]) if profile.skills else 'relevant technologies'
+
+        # Use LLM when custom requirements are provided
+        if custom_requirements:
+            experiences_summary = '; '.join(
+                [f"{e.title} at {e.company}" for e in profile.experiences[:3]]
+            ) if profile.experiences else 'no listed experience'
+
+            prompt = f"""Write a LinkedIn referral request message with the following details:
+
+Sender: {profile.name or 'the applicant'}
+Target role: {job_title} at {company}
+Sender's experience: {experiences_summary}
+Sender's top skills: {top_skills}
+Message tone: {tone}
+Custom requirements: {custom_requirements}
+
+Rules:
+- Address the recipient as [Name] (placeholder)
+- Keep it genuine and human, not overly salesy
+- Apply the tone ({tone}) and every custom requirement strictly
+- End with the sender's name: {profile.name or 'Your Name'}
+- Return only the message text, no extra commentary"""
+
+            response = openai_client.chat.completions.create(
+                model=config.agent.model,
+                messages=[
+                    {"role": "system", "content": "You write concise, personalized LinkedIn referral request messages."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=400,
+            )
+            message = response.choices[0].message.content.strip()
+
+        else:
+            # Template fallback when no custom requirements
+            if tone == 'professional':
+                message = f"""Hi [Name],
 
 I hope this message finds you well. I noticed that {company} is hiring for the {job_title} position, and I am very interested in this opportunity.
 
@@ -427,9 +464,9 @@ Thank you for considering my request. I look forward to the possibility of worki
 
 Best regards,
 {profile.name or 'Your Name'}"""
-        
-        elif tone == 'friendly':
-            message = f"""Hey [Name]!
+
+            elif tone == 'friendly':
+                message = f"""Hey [Name]!
 
 Hope you're doing well! I saw that {company} is looking for a {job_title}, and I'm really excited about this opportunity.
 
@@ -439,9 +476,9 @@ Would you be able to refer me or point me in the right direction? I'd really app
 
 Thanks so much!
 {profile.name or 'Your Name'}"""
-        
-        else:  # concise
-            message = f"""Hi [Name],
+
+            else:  # concise
+                message = f"""Hi [Name],
 
 I'm interested in the {job_title} role at {company}. With my experience in {experience_title} and {top_skills}, I believe I'd be a strong candidate.
 
@@ -449,12 +486,12 @@ Would you be able to refer me or connect me with the hiring team?
 
 Thanks,
 {profile.name or 'Your Name'}"""
-        
+
         return {
             "success": True,
             "message": message
         }
-    
+
     except Exception as e:
         logger.error(f"Error generating LinkedIn message: {e}")
         raise HTTPException(status_code=500, detail=str(e))

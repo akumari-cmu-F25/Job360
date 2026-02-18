@@ -113,11 +113,12 @@ export const api = {
   },
 
   // LinkedIn referral message
-  generateLinkedInMessage: async (job: any, profile: any, tone: string) => {
+  generateLinkedInMessage: async (job: any, profile: any, tone: string, customRequirements?: string) => {
     const response = await client.post('/api/linkedin/generate-message', {
       job,
       profile,
       tone,
+      custom_requirements: customRequirements || '',
     })
     return response.data
   },

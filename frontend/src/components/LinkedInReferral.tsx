@@ -14,6 +14,7 @@ export default function LinkedInReferral({ job, profile, onClose }: LinkedInRefe
   const [loading, setLoading] = useState(false)
   const [tone, setTone] = useState<'professional' | 'friendly' | 'concise'>('professional')
   const [copied, setCopied] = useState(false)
+  const [customRequirements, setCustomRequirements] = useState<string>('')
 
   useEffect(() => {
     generateMessage()
@@ -22,7 +23,7 @@ export default function LinkedInReferral({ job, profile, onClose }: LinkedInRefe
   const generateMessage = async () => {
     setLoading(true)
     try {
-      const result = await api.generateLinkedInMessage(job, profile, tone)
+      const result = await api.generateLinkedInMessage(job, profile, tone, customRequirements)
       if (result.success) {
         setMessage(result.message)
       }
@@ -97,6 +98,29 @@ ${profile.name || 'Your Name'}`
               onClick={() => setTone('concise')}
             >
               Concise
+            </button>
+          </div>
+        </div>
+
+        <div className="requirements-bar">
+          <label className="requirements-label">
+            Custom Instructions
+            <span className="requirements-optional">optional</span>
+          </label>
+          <div className="requirements-input-row">
+            <textarea
+              className="requirements-textarea"
+              value={customRequirements}
+              onChange={(e) => setCustomRequirements(e.target.value)}
+              placeholder="e.g. mention I'm a recent grad, keep it under 80 words, highlight my internship at Google…"
+              rows={2}
+            />
+            <button
+              className="btn-apply"
+              onClick={generateMessage}
+              disabled={loading}
+            >
+              Apply
             </button>
           </div>
         </div>

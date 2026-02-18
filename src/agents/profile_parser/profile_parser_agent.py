@@ -227,21 +227,24 @@ Be extremely thorough. Extract ALL information present in the resume. If a field
             
             content = response.choices[0].message.content
             structured_data = json.loads(content)
-            
+
+            # Normalize: replace null list fields with empty lists
+            list_fields = [
+                "experiences", "education", "skills", "projects",
+                "certifications", "awards", "publications", "languages", "other_sections"
+            ]
+            for field in list_fields:
+                if not structured_data.get(field):
+                    structured_data[field] = []
+
             # Log what was extracted for debugging
-            logger.info(f"Extracted sections: experiences={len(structured_data.get('experiences', []))}, "
-                       f"education={len(structured_data.get('education', []))}, "
-                       f"projects={len(structured_data.get('projects', []))}, "
-                       f"certifications={len(structured_data.get('certifications', []))}, "
-                       f"awards={len(structured_data.get('awards', []))}, "
-                       f"other_sections={len(structured_data.get('other_sections', []))}")
-            
-            # Ensure all expected keys exist
-            if "other_sections" not in structured_data:
-                structured_data["other_sections"] = []
-            if "publications" not in structured_data:
-                structured_data["publications"] = []
-            
+            logger.info(f"Extracted sections: experiences={len(structured_data['experiences'])}, "
+                       f"education={len(structured_data['education'])}, "
+                       f"projects={len(structured_data['projects'])}, "
+                       f"certifications={len(structured_data['certifications'])}, "
+                       f"awards={len(structured_data['awards'])}, "
+                       f"other_sections={len(structured_data['other_sections'])}")
+
             return structured_data
             
         except json.JSONDecodeError as e:
@@ -283,12 +286,12 @@ Be extremely thorough. Extract ALL information present in the resume. If a field
                 location=exp_data.get("location"),
                 start_date=exp_data.get("start_date"),
                 end_date=exp_data.get("end_date"),
-                is_current=exp_data.get("is_current", False),
-                bullets=exp_data.get("bullets", []),
-                technologies=exp_data.get("technologies", [])
+                is_current=exp_data.get("is_current") or False,
+                bullets=exp_data.get("bullets") or [],
+                technologies=exp_data.get("technologies") or []
             )
             experiences.append(exp)
-        
+
         # Build education
         education = []
         for edu_data in structured_data.get("education", []):
@@ -299,11 +302,11 @@ Be extremely thorough. Extract ALL information present in the resume. If a field
                 location=edu_data.get("location"),
                 graduation_date=edu_data.get("graduation_date"),
                 gpa=edu_data.get("gpa"),
-                honors=edu_data.get("honors", []),
-                relevant_coursework=edu_data.get("relevant_coursework", [])
+                honors=edu_data.get("honors") or [],
+                relevant_coursework=edu_data.get("relevant_coursework") or []
             )
             education.append(edu)
-        
+
         # Build skills
         skills = []
         for skill_data in structured_data.get("skills", []):
@@ -314,36 +317,36 @@ Be extremely thorough. Extract ALL information present in the resume. If a field
                     category = SkillCategory(category_str)
                 except ValueError:
                     category = None
-            
+
             skill = Skill(
-                name=skill_data.get("name", ""),
+                name=skill_data.get("name") or "",
                 category=category,
                 proficiency=skill_data.get("proficiency")
             )
             skills.append(skill)
-        
+
         # Build projects
         projects = []
         for proj_data in structured_data.get("projects", []):
             proj = Project(
-                name=proj_data.get("name", ""),
+                name=proj_data.get("name") or "",
                 description=proj_data.get("description"),
                 start_date=proj_data.get("start_date"),
                 end_date=proj_data.get("end_date"),
-                technologies=proj_data.get("technologies", []),
-                bullets=proj_data.get("bullets", []),
+                technologies=proj_data.get("technologies") or [],
+                bullets=proj_data.get("bullets") or [],
                 url=proj_data.get("url"),
                 role=proj_data.get("role")
             )
             projects.append(proj)
-        
+
         # Build other sections
         from .profile_models import Section
         other_sections = []
         for section_data in structured_data.get("other_sections", []):
             section = Section(
-                name=section_data.get("name", ""),
-                items=section_data.get("items", [])
+                name=section_data.get("name") or "",
+                items=section_data.get("items") or []
             )
             other_sections.append(section)
         
