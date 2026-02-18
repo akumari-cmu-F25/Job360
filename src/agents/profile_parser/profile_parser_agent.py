@@ -196,6 +196,7 @@ CRITICAL INSTRUCTIONS:
 5. If you see a "Leadership" section, it MUST go in "other_sections" with name "Leadership"
 6. If you see an "Awards" section, it MUST go in "awards" array
 7. Do NOT skip any sections - extract everything
+8. If a field is not present in the resume, use null or omit it - do NOT use placeholder text like "Unknown Company"
 
 Common section names to look for:
 - Leadership / Leadership Experience / Positions of Leadership
@@ -207,7 +208,7 @@ Common section names to look for:
 - Extracurricular Activities / Activities
 - Professional Associations / Memberships
 
-Be extremely thorough. Extract ALL information present in the resume. If a field is not present, use null or empty array, but DO extract everything that IS present.
+Be extremely thorough. Extract ALL information present in the resume. If a field is not present, use null or empty array.
 """
         
         try:
@@ -277,8 +278,8 @@ Be extremely thorough. Extract ALL information present in the resume. If a field
         experiences = []
         for exp_data in structured_data.get("experiences", []):
             exp = Experience(
-                title=exp_data.get("title", ""),
-                company=exp_data.get("company", ""),
+                title=exp_data.get("title"),
+                company=exp_data.get("company"),
                 location=exp_data.get("location"),
                 start_date=exp_data.get("start_date"),
                 end_date=exp_data.get("end_date"),
@@ -292,9 +293,9 @@ Be extremely thorough. Extract ALL information present in the resume. If a field
         education = []
         for edu_data in structured_data.get("education", []):
             edu = Education(
-                degree=edu_data.get("degree", ""),
+                degree=edu_data.get("degree"),
                 field_of_study=edu_data.get("field_of_study"),
-                institution=edu_data.get("institution", ""),
+                institution=edu_data.get("institution"),
                 location=edu_data.get("location"),
                 graduation_date=edu_data.get("graduation_date"),
                 gpa=edu_data.get("gpa"),
