@@ -5,9 +5,10 @@ import RightPanel from './components/RightPanel'
 import Dashboard from './components/Dashboard'
 import LinkedInReferral from './components/LinkedInReferral'
 import InterviewPrep from './components/InterviewPrep'
+import LaunchPage from './components/LaunchPage'
 import { Profile, Job } from './types'
 
-type View = 'editor' | 'dashboard'
+type View = 'launch' | 'editor' | 'dashboard'
 
 function App() {
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -16,7 +17,7 @@ function App() {
   const [jobQueue, setJobQueue] = useState<Job[]>([])
   const [currentJobIndex, setCurrentJobIndex] = useState<number>(-1)
   const [jobListings, setJobListings] = useState<Job[]>([])
-  const [currentView, setCurrentView] = useState<View>('dashboard')
+  const [currentView, setCurrentView] = useState<View>('launch')
   const [selectedJobForLinkedIn, setSelectedJobForLinkedIn] = useState<Job | null>(null)
   const [selectedJobForPrep, setSelectedJobForPrep] = useState<Job | null>(null)
 
@@ -31,27 +32,44 @@ function App() {
     }
   }
 
+  const handleStartSearch = (uploadedProfile: Profile, category: string) => {
+    setProfile(uploadedProfile)
+    setOriginalProfile(uploadedProfile)
+    setEditedProfile(uploadedProfile)
+    setCurrentView('editor')
+  }
+
   return (
     <div className="app-container">
-      <div className="app-header">
-        <h1 className="app-title">Job360</h1>
-        <div className="view-toggle">
-          <button
-            className={`view-btn ${currentView === 'editor' ? 'active' : ''}`}
-            onClick={() => setCurrentView('editor')}
+      {currentView !== 'launch' && (
+        <div className="app-header">
+          <h1
+            className="app-title"
+            onClick={() => setCurrentView('launch')}
+            style={{ cursor: 'pointer' }}
           >
-            Resume Editor
-          </button>
-          <button
-            className={`view-btn ${currentView === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setCurrentView('dashboard')}
-          >
-            Dashboard
-          </button>
+            Job360
+          </h1>
+          <div className="view-toggle">
+            <button
+              className={`view-btn ${currentView === 'editor' ? 'active' : ''}`}
+              onClick={() => setCurrentView('editor')}
+            >
+              Resume Editor
+            </button>
+            <button
+              className={`view-btn ${currentView === 'dashboard' ? 'active' : ''}`}
+              onClick={() => setCurrentView('dashboard')}
+            >
+              Dashboard
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {currentView === 'editor' ? (
+      {currentView === 'launch' ? (
+        <LaunchPage onStartSearch={handleStartSearch} existingProfile={profile} />
+      ) : currentView === 'editor' ? (
         <div className="editor-view">
           <LeftPanel
             profile={profile}
@@ -78,7 +96,7 @@ function App() {
             onJobQueueChange={setJobQueue}
           />
         </div>
-      ) : (
+      ) : currentView === 'dashboard' ? (
         <Dashboard
           jobQueue={jobQueue}
           profile={profile}
@@ -86,7 +104,7 @@ function App() {
           onInterviewPrep={(job) => setSelectedJobForPrep(job)}
           onLinkedInReferral={(job) => setSelectedJobForLinkedIn(job)}
         />
-      )}
+      ) : null}
 
       {selectedJobForLinkedIn && profile && (
         <LinkedInReferral
