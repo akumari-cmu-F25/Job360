@@ -123,6 +123,12 @@ export const api = {
     return response.data
   },
 
+  // Job description fetch (URL pre-fetch before queuing)
+  fetchJD: async (url: string) => {
+    const response = await client.post('/api/jd/fetch', { url })
+    return response.data
+  },
+
   // Interview prep
   generateInterviewPrep: async (job: any) => {
     const response = await client.post('/api/interview/prep-plan', {

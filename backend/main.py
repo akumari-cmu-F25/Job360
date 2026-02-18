@@ -201,6 +201,10 @@ async def process_job_background(job_id: str, request: Dict[str, Any]):
 
 
 # Pydantic models for requests
+class JDFetchRequest(BaseModel):
+    url: str
+
+
 class JobSearchRequest(BaseModel):
     category: str
     location: Optional[str] = None
@@ -222,6 +226,28 @@ class VoiceInstructionRequest(BaseModel):
 @app.get("/")
 async def root():
     return {"message": "Resume Orchestrator API", "status": "running"}
+
+
+@app.post("/api/jd/fetch")
+def fetch_jd_preview(request: JDFetchRequest):
+    """Fetch and preview a job description from a URL before queuing.
+
+    Uses a sync def route so FastAPI runs it in a thread pool, avoiding
+    event-loop blocking from the underlying requests.get() calls.
+    """
+    result = jd_fetcher.fetch(request.url)
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=422,
+            detail=result.get("error", "Failed to fetch job description from URL"),
+        )
+    return {
+        "success": True,
+        "title": result.get("title"),
+        "company": result.get("company"),
+        "description": (result.get("text") or "")[:500],
+        "full_description": result.get("text") or "",
+    }
 
 
 @app.post("/api/resume/upload")

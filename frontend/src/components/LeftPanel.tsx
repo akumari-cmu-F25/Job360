@@ -46,6 +46,7 @@ export default function LeftPanel({
   const [jdUrl, setJdUrl] = useState<string>('')
   const [inputMode, setInputMode] = useState<'search' | 'url'>('search')
   const [loading, setLoading] = useState(false)
+  const [urlLoading, setUrlLoading] = useState(false)
   const [searching, setSearching] = useState(false)
   const [activeTab, setActiveTab] = useState<'upload' | 'search' | 'queue'>('upload')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -97,21 +98,27 @@ export default function LeftPanel({
     }
   }
 
-  const handleAddUrlToQueue = () => {
+  const handleAddUrlToQueue = async () => {
     if (!jdUrl.trim()) return
-
-    const job: Job = {
-      title: 'Job from URL',
-      company: 'Unknown',
-      url: jdUrl.trim(),
-      status: 'queued',
-    }
-
-    const jobWithId = { ...job, id: generateJobId(job) }
-
-    if (!jobQueue.find((j) => j.id === jobWithId.id)) {
-      onJobQueueChange([...jobQueue, jobWithId])
-      setJdUrl('')
+    setUrlLoading(true)
+    try {
+      const result = await api.fetchJD(jdUrl.trim())
+      const job: Job = {
+        title: result.title || 'Job from URL',
+        company: result.company || 'Unknown',
+        url: jdUrl.trim(),
+        description: result.full_description,
+        status: 'queued',
+      }
+      const jobWithId = { ...job, id: generateJobId(job) }
+      if (!jobQueue.find((j) => j.id === jobWithId.id)) {
+        onJobQueueChange([...jobQueue, jobWithId])
+        setJdUrl('')
+      }
+    } catch {
+      alert('Could not fetch job from URL. Try pasting the description directly.')
+    } finally {
+      setUrlLoading(false)
     }
   }
 
@@ -295,10 +302,10 @@ export default function LeftPanel({
                 />
                 <button
                   onClick={handleAddUrlToQueue}
-                  disabled={!jdUrl.trim()}
+                  disabled={!jdUrl.trim() || urlLoading}
                   className="add-url-button"
                 >
-                  Add to Queue
+                  {urlLoading ? 'Fetching...' : 'Add to Queue'}
                 </button>
               </div>
             )}
