@@ -6,8 +6,11 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import json
+from src.config import config
 
 logger = logging.getLogger(__name__)
+
+JSEARCH_URL = "https://jsearch.p.rapidapi.com/search"
 
 
 class JobFetcher:
@@ -51,15 +54,10 @@ class JobFetcher:
         
         search_terms = category_map.get(category, [category.lower()])
         
-        # Search multiple sources
+        # Search via JSearch (aggregates LinkedIn, Indeed, Glassdoor, and others)
         for term in search_terms:
-            # LinkedIn jobs (simulated - would need API or scraping)
-            linkedin_jobs = self._search_linkedin(term, location, hours_ago)
-            jobs.extend(linkedin_jobs)
-            
-            # Indeed jobs (simulated)
-            indeed_jobs = self._search_indeed(term, location, hours_ago)
-            jobs.extend(indeed_jobs)
+            jsearch_jobs = self._search_jsearch(term, location, hours_ago)
+            jobs.extend(jsearch_jobs)
         
         # Remove duplicates and filter by date
         unique_jobs = self._deduplicate_jobs(jobs)
@@ -70,87 +68,46 @@ class JobFetcher:
         
         logger.info(f"Found {len(filtered_jobs)} jobs in category '{category}' posted within {hours_ago} hours")
         
-        return filtered_jobs[:50]  # Limit to 50 results
-    
-    def _search_linkedin(self, term: str, location: Optional[str], hours_ago: int) -> List[Dict[str, Any]]:
-        """Search LinkedIn jobs (simulated - would need actual API/scraping)."""
-        # This is a placeholder - in production, would use LinkedIn API or scraping
-        # For now, return sample jobs with full descriptions that can be used
-        sample_jobs = [
-            {
-                "title": f"{term.title()} Engineer",
-                "company": "Tech Corp",
-                "location": location or "Remote",
-                "url": f"https://linkedin.com/jobs/view/12345",
-                "posted_date": (datetime.now() - timedelta(hours=12)).isoformat(),
-                "source": "LinkedIn",
-                "description": f"""Looking for a {term} engineer to join our team. 
-                Responsibilities include:
-                - Design and implement scalable systems
-                - Work with distributed systems and microservices
-                - Collaborate with cross-functional teams
-                - Optimize performance and reliability
-                
-                Requirements:
-                - Strong experience with {term}
-                - Knowledge of cloud platforms (AWS, Azure, GCP)
-                - Experience with containerization (Docker, Kubernetes)
-                - Excellent problem-solving skills"""
-            },
-            {
-                "title": f"Senior {term.title()} Developer",
-                "company": "Startup Inc",
-                "location": location or "San Francisco, CA",
-                "url": f"https://linkedin.com/jobs/view/12346",
-                "posted_date": (datetime.now() - timedelta(hours=24)).isoformat(),
-                "source": "LinkedIn",
-                "description": f"""Senior {term} developer position. 
-                We are looking for an experienced engineer to lead development efforts.
-                
-                Key responsibilities:
-                - Lead technical architecture decisions
-                - Mentor junior engineers
-                - Build and maintain critical systems
-                - Drive innovation in {term} space
-                
-                Required skills:
-                - 5+ years experience in {term}
-                - Strong leadership abilities
-                - Experience with modern development practices
-                - Bachelor's degree in Computer Science or related field"""
-            }
-        ]
-        return sample_jobs
-    
-    def _search_indeed(self, term: str, location: Optional[str], hours_ago: int) -> List[Dict[str, Any]]:
-        """Search Indeed jobs (simulated)."""
-        sample_jobs = [
-            {
-                "title": f"{term.title()} Specialist",
-                "company": "Big Tech",
-                "location": location or "New York, NY",
-                "url": f"https://indeed.com/viewjob?jk=abc123",
-                "posted_date": (datetime.now() - timedelta(hours=18)).isoformat(),
-                "source": "Indeed",
-                "description": f"""{term} specialist role at a leading technology company.
-                
-                Job Description:
-                We are seeking a talented {term} specialist to join our engineering team.
-                
-                What you'll do:
-                - Develop and maintain {term} solutions
-                - Work on challenging technical problems
-                - Contribute to open source projects
-                - Participate in code reviews and technical discussions
-                
-                Qualifications:
-                - Strong background in {term}
-                - Experience with software development lifecycle
-                - Good communication skills
-                - Ability to work in a fast-paced environment"""
-            }
-        ]
-        return sample_jobs
+        return filtered_jobs[:10]  # Limit to 10 results
+
+    def _search_jsearch(self, term: str, location: Optional[str], hours_ago: int) -> List[Dict[str, Any]]:
+        """Search jobs via JSearch (aggregates LinkedIn, Indeed, Glassdoor)."""
+        if not config.rapidapi_key:
+            logger.warning("RAPIDAPI_KEY not set – skipping real job search")
+            return []
+
+        headers = {
+            "X-RapidAPI-Key": config.rapidapi_key,
+            "X-RapidAPI-Host": "jsearch.p.rapidapi.com",
+        }
+        params = {
+            "query": f"{term} {location or ''}".strip(),
+            "page": "1",
+            "num_pages": "2",
+            "date_posted": "today" if hours_ago <= 24 else "3days",
+        }
+
+        try:
+            response = requests.get(JSEARCH_URL, headers=headers, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+        except Exception as e:
+            logger.error(f"JSearch request failed: {e}")
+            return []
+
+        jobs = []
+        for item in data.get("data", []):
+            jobs.append({
+                "title": item.get("job_title"),
+                "company": item.get("employer_name"),
+                "location": item.get("job_city") or item.get("job_country") or "Remote",
+                "url": item.get("job_apply_link") or item.get("job_google_link"),
+                "posted_date": item.get("job_posted_at_datetime_utc"),
+                "source": item.get("job_publisher", "JSearch"),
+                "description": item.get("job_description", ""),
+            })
+
+        return jobs
     
     def _deduplicate_jobs(self, jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Remove duplicate jobs based on URL."""

@@ -34,6 +34,7 @@ class EvaluationConfig(BaseModel):
 class Config(BaseModel):
     """Main configuration class."""
     openai_api_key: str = Field(..., description="OpenAI API key")
+    rapidapi_key: Optional[str] = Field(default=None, description="RapidAPI key for job search")
     agent: AgentConfig = Field(default_factory=AgentConfig)
     guardrails: GuardrailConfig = Field(default_factory=GuardrailConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
@@ -47,6 +48,7 @@ class Config(BaseModel):
 
         return cls(
             openai_api_key=api_key,
+            rapidapi_key=os.getenv("RAPIDAPI_KEY"),
             agent=AgentConfig(
                 model=os.getenv("AGENT_MODEL", "gpt-4o"),
                 stt_model=os.getenv("STT_MODEL", "whisper-1"),
