@@ -30,7 +30,16 @@
         "Designed and implemented a type-safe full-stack architecture with TypeScript, Next.js, tRPC, Prisma, and PostgreSQL, enabling secure draft-based workflows for AI-assisted police report submission and improving data integrity through strict schema enforcement",
         "Integrated GPT-4–powered dynamic form generation with streaming responses, schema validation (Zod), and LiveKit-based speech-to-text pipelines to streamline report filing, reducing completion time by 30% across 25+ dynamic form fields in production"
       ],
-      "technologies": ["TypeScript", "Next.js", "tRPC", "Prisma", "PostgreSQL", "GPT-4", "Zod", "LiveKit"]
+      "technologies": [
+        "TypeScript",
+        "Next.js",
+        "tRPC",
+        "Prisma",
+        "PostgreSQL",
+        "GPT-4",
+        "Zod",
+        "LiveKit"
+      ]
     },
     {
       "title": "Software Engineer Intern (R&D)",

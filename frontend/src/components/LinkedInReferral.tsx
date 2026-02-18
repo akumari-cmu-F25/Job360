@@ -39,7 +39,10 @@ export default function LinkedInReferral({ job, profile, onClose }: LinkedInRefe
 
 I hope this message finds you well! I noticed that ${job.company} is hiring for the ${job.title} position, and I'm very excited about this opportunity.
 
-With my background in ${profile.experiences[0]?.title || 'software development'} and experience with ${profile.skills.slice(0, 3).map(s => s.name).join(', ')}, I believe I would be a great fit for this role.
+With my background in ${profile.experiences[0]?.title || 'software development'} and experience with ${profile.skills
+      .slice(0, 3)
+      .map((s) => s.name)
+      .join(', ')}, I believe I would be a great fit for this role.
 
 I would greatly appreciate it if you could refer me for this position or connect me with the hiring manager. I've attached my resume and would be happy to discuss how my skills align with the team's needs.
 
@@ -64,7 +67,9 @@ ${profile.name || 'Your Name'}`
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>LinkedIn Referral Message</h2>
-          <button className="close-btn" onClick={onClose}>×</button>
+          <button className="close-btn" onClick={onClose}>
+            ×
+          </button>
         </div>
 
         <div className="job-info">

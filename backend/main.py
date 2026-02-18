@@ -1,6 +1,6 @@
 """FastAPI Backend for Resume Orchestrator Agents."""
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -9,6 +9,8 @@ import asyncio
 import sys
 from pathlib import Path
 import logging
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -30,6 +32,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Resume Orchestrator API")
+
+# Create thread pool executor for blocking operations
+executor = ThreadPoolExecutor(max_workers=4)
 
 # CORS middleware
 app.add_middleware(
@@ -55,6 +60,140 @@ orchestrator.register_agent(rewrite_agent)
 job_fetcher = JobFetcher()
 jd_fetcher = JDFetcher()
 resume_exporter = ResumeExporter()
+
+# Job processing queue to store results
+job_results = {}
+upload_results = {}
+
+
+async def process_resume_background(upload_id: str, tmp_path: str):
+    """Process resume upload in background and store results."""
+    try:
+        # Parse resume
+        result = await profile_agent.parse_resume(tmp_path)
+        
+        # Clean up temp file
+        os.unlink(tmp_path)
+        
+        if result["success"]:
+            # Convert Profile to dict for JSON response
+            profile_dict = result["profile"].model_dump()
+            upload_results[upload_id] = {
+                "success": True,
+                "profile": profile_dict,
+                "message": "Resume parsed successfully"
+            }
+        else:
+            upload_results[upload_id] = {
+                "success": False,
+                "error": result.get("error", "Failed to parse resume")
+            }
+    
+    except Exception as e:
+        logger.error(f"Error processing resume {upload_id}: {e}")
+        # Clean up temp file on error
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
+        upload_results[upload_id] = {"success": False, "error": str(e)}
+
+
+async def process_job_background(job_id: str, request: Dict[str, Any]):
+    """Process job in background and store results."""
+    try:
+        # Extract data from request
+        profile_data = request.get('profile_data')
+        if not profile_data:
+            job_results[job_id] = {"success": False, "error": "Profile data required"}
+            return
+        
+        # Reconstruct Profile from dict
+        profile = Profile(**profile_data)
+        
+        # Get job description
+        job_url = request.get('job_url')
+        job_description = request.get('job_description')
+        jd_text = None
+        
+        # Try to fetch from URL first
+        if job_url:
+            try:
+                result = jd_fetcher.fetch(job_url)
+                if result["success"]:
+                    jd_text = result["text"]
+                    logger.info(f"Successfully fetched JD from URL: {len(jd_text)} characters")
+            except Exception as e:
+                logger.warning(f"Failed to fetch from URL {job_url}: {e}")
+        
+        # Fallback to job_description if URL fetch failed
+        if not jd_text and job_description:
+            jd_text = job_description
+            logger.info(f"Using provided job description: {len(jd_text)} characters")
+        
+        # If still no JD text, try to get from job data in request
+        if not jd_text:
+            job_data = request.get('job', {})
+            if isinstance(job_data, dict) and job_data.get('description'):
+                jd_text = job_data['description']
+                logger.info(f"Using job description from job data: {len(jd_text)} characters")
+        
+        if not jd_text:
+            job_results[job_id] = {"success": False, "error": "No job description available"}
+            return
+        
+        # Analyze JD - run in thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        jd_analysis = await loop.run_in_executor(
+            executor,
+            lambda: asyncio.run(jd_agent.process(
+                input_data=None,
+                jd_text=jd_text,
+                jd_url=job_url
+            ))
+        )
+        
+        # Customize resume - run in thread pool to avoid blocking
+        result = await loop.run_in_executor(
+            executor,
+            lambda: asyncio.run(rewrite_agent.customize_resume(
+                profile=profile,
+                jd=jd_analysis,
+                company_name=None,
+                job_role=None
+            ))
+        )
+        
+        if result["success"]:
+            edited_profile_dict = result["edited_profile"].model_dump()
+            
+            # Calculate changes made
+            changes_summary = {
+                "summary_changed": profile.summary != result["edited_profile"].summary,
+                "experiences_edited": len([e for e in result["edited_profile"].experiences if e.bullets]),
+                "projects_edited": len([p for p in result["edited_profile"].projects if p.bullets]),
+                "skills_added": len(result["edited_profile"].skills) - len(profile.skills),
+            }
+            
+            job_results[job_id] = {
+                "success": True,
+                "edited_profile": edited_profile_dict,
+                "jd_analysis": {
+                    "title": jd_analysis.title,
+                    "company": jd_analysis.company,
+                    "required_skills": [s.skill for s in jd_analysis.required_skills[:10]],
+                    "ats_keywords": jd_analysis.ats_keywords[:20]
+                },
+                "changes_summary": changes_summary
+            }
+        else:
+            error_msg = result.get("error", "Failed to customize resume")
+            logger.error(f"Resume customization failed: {error_msg}")
+            job_results[job_id] = {"success": False, "error": error_msg}
+    
+    except Exception as e:
+        logger.error(f"Error processing job {job_id}: {e}")
+        job_results[job_id] = {"success": False, "error": str(e)}
 
 
 # Pydantic models for requests
@@ -82,8 +221,8 @@ async def root():
 
 
 @app.post("/api/resume/upload")
-async def upload_resume(file: UploadFile = File(...)):
-    """Upload and parse resume."""
+async def upload_resume(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
+    """Upload and parse resume (non-blocking)."""
     try:
         # Save uploaded file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp:
@@ -91,26 +230,45 @@ async def upload_resume(file: UploadFile = File(...)):
             tmp.write(content)
             tmp_path = tmp.name
         
-        # Parse resume
-        result = await profile_agent.parse_resume(tmp_path)
+        # Generate unique upload ID
+        upload_id = str(uuid.uuid4())
         
-        # Clean up temp file
-        os.unlink(tmp_path)
-        
-        if result["success"]:
-            # Convert Profile to dict for JSON response
-            profile_dict = result["profile"].model_dump()
-            return {
-                "success": True,
-                "profile": profile_dict,
-                "message": "Resume parsed successfully"
-            }
+        # Start background processing
+        if background_tasks:
+            background_tasks.add_task(process_resume_background, upload_id, tmp_path)
         else:
-            raise HTTPException(status_code=400, detail=result.get("error", "Failed to parse resume"))
+            # Fallback for testing without background tasks
+            import asyncio
+            asyncio.create_task(process_resume_background(upload_id, tmp_path))
+        
+        # Return immediately with upload ID
+        return {
+            "success": True,
+            "upload_id": upload_id,
+            "message": "Resume upload started"
+        }
     
     except Exception as e:
-        logger.error(f"Error uploading resume: {e}")
+        logger.error(f"Error starting resume upload: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/resume/upload/{upload_id}")
+async def get_upload_result(upload_id: str):
+    """Get the result of a resume upload request."""
+    if upload_id not in upload_results:
+        return {
+            "success": False,
+            "status": "processing",
+            "message": "Resume is still being processed"
+        }
+    
+    result = upload_results[upload_id]
+    # Clean up old results after retrieval
+    if result.get("success"):
+        del upload_results[upload_id]
+    
+    return result
 
 
 @app.post("/api/jobs/search")
@@ -134,94 +292,43 @@ async def search_jobs(request: JobSearchRequest):
 
 
 @app.post("/api/jobs/apply")
-async def apply_to_job(request: Dict[str, Any]):
-    """Customize resume for a job application."""
+async def apply_to_job(request: Dict[str, Any], background_tasks: BackgroundTasks):
+    """Customize resume for a job application (non-blocking)."""
     try:
-        # Extract data from request
-        profile_data = request.get('profile_data')
-        if not profile_data:
-            raise HTTPException(status_code=400, detail="Profile data required")
+        # Generate unique job ID
+        job_id = str(uuid.uuid4())
         
-        # Reconstruct Profile from dict
-        profile = Profile(**profile_data)
+        # Start background processing
+        background_tasks.add_task(process_job_background, job_id, request)
         
-        # Get job description
-        job_url = request.get('job_url')
-        job_description = request.get('job_description')
-        jd_text = None
-        
-        # Try to fetch from URL first
-        if job_url:
-            try:
-                result = jd_fetcher.fetch(job_url)
-                if result["success"]:
-                    jd_text = result["text"]
-                    logger.info(f"Successfully fetched JD from URL: {len(jd_text)} characters")
-            except Exception as e:
-                logger.warning(f"Failed to fetch from URL {job_url}: {e}")
-                # Continue to try job_description
-        
-        # Fallback to job_description if URL fetch failed
-        if not jd_text and job_description:
-            jd_text = job_description
-            logger.info(f"Using provided job description: {len(jd_text)} characters")
-        
-        # If still no JD text, try to get from job data in request
-        if not jd_text:
-            # Check if job data has description
-            job_data = request.get('job', {})
-            if isinstance(job_data, dict) and job_data.get('description'):
-                jd_text = job_data['description']
-                logger.info(f"Using job description from job data: {len(jd_text)} characters")
-        
-        if not jd_text:
-            raise HTTPException(status_code=400, detail="No job description available. Please provide a valid URL or job description text.")
-        
-        # Analyze JD
-        jd_analysis = await jd_agent.process(
-            input_data=None,
-            jd_text=jd_text,
-            jd_url=job_url
-        )
-        
-        # Customize resume
-        result = await rewrite_agent.customize_resume(
-            profile=profile,
-            jd=jd_analysis,
-            company_name=None,
-            job_role=None
-        )
-        
-        if result["success"]:
-            edited_profile_dict = result["edited_profile"].model_dump()
-            
-            # Calculate changes made
-            changes_summary = {
-                "summary_changed": profile.summary != result["edited_profile"].summary,
-                "experiences_edited": len([e for e in result["edited_profile"].experiences if e.bullets]),
-                "projects_edited": len([p for p in result["edited_profile"].projects if p.bullets]),
-                "skills_added": len(result["edited_profile"].skills) - len(profile.skills),
-            }
-            
-            return {
-                "success": True,
-                "edited_profile": edited_profile_dict,
-                "jd_analysis": {
-                    "title": jd_analysis.title,
-                    "company": jd_analysis.company,
-                    "required_skills": [s.skill for s in jd_analysis.required_skills[:10]],
-                    "ats_keywords": jd_analysis.ats_keywords[:20]
-                },
-                "changes_summary": changes_summary
-            }
-        else:
-            error_msg = result.get("error", "Failed to customize resume")
-            logger.error(f"Resume customization failed: {error_msg}")
-            raise HTTPException(status_code=400, detail=error_msg)
+        # Return immediately with job ID
+        return {
+            "success": True,
+            "job_id": job_id,
+            "message": "Job processing started"
+        }
     
     except Exception as e:
-        logger.error(f"Error applying to job: {e}")
+        logger.error(f"Error starting job processing: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/jobs/apply/{job_id}")
+async def get_job_result(job_id: str):
+    """Get the result of a job processing request."""
+    if job_id not in job_results:
+        return {
+            "success": False,
+            "status": "processing",
+            "message": "Job is still processing"
+        }
+    
+    result = job_results[job_id]
+    # Clean up old results after retrieval
+    if result.get("success"):
+        del job_results[job_id]
+    
+    return result
 
 
 @app.post("/api/resume/export")

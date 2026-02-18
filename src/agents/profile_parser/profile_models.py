@@ -21,8 +21,8 @@ class SkillCategory(str, Enum):
 
 class Experience(BaseModel):
     """Work experience entry."""
-    title: str
-    company: str
+    title: Optional[str] = None
+    company: Optional[str] = None
     location: Optional[str] = None
     start_date: Optional[str] = None  # Format: "YYYY-MM" or "YYYY"
     end_date: Optional[str] = None  # "YYYY-MM", "YYYY", or "Present"
@@ -36,9 +36,9 @@ class Experience(BaseModel):
 
 class Education(BaseModel):
     """Education entry."""
-    degree: str
+    degree: Optional[str] = None
     field_of_study: Optional[str] = None
-    institution: str
+    institution: Optional[str] = None
     location: Optional[str] = None
     graduation_date: Optional[str] = None  # "YYYY-MM" or "YYYY"
     gpa: Optional[float] = None

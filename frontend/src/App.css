@@ -25,7 +25,13 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--color-primary), var(--color-secondary), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-primary),
+    var(--color-secondary),
+    transparent
+  );
   opacity: 0.3;
 }
 
@@ -107,11 +113,11 @@
   .app-header {
     padding: 0.75rem 1rem;
   }
-  
+
   .app-title {
     font-size: 1.25rem;
   }
-  
+
   .view-btn {
     padding: 0.375rem 1rem;
     font-size: 0.8125rem;

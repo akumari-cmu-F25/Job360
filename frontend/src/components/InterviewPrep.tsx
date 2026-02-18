@@ -29,7 +29,9 @@ interface PrepPlan {
 export default function InterviewPrep({ job, onClose }: InterviewPrepProps) {
   const [prepPlan, setPrepPlan] = useState<PrepPlan | null>(null)
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'leetcode' | 'system-design' | 'behavioral'>('leetcode')
+  const [activeTab, setActiveTab] = useState<'leetcode' | 'system-design' | 'behavioral'>(
+    'leetcode'
+  )
 
   useEffect(() => {
     generatePrepPlan()
@@ -58,84 +60,84 @@ export default function InterviewPrep({ job, onClose }: InterviewPrepProps) {
           difficulty: 'Easy',
           topic: 'Arrays & Hashing',
           url: 'https://leetcode.com/problems/two-sum/',
-          priority: 'High'
+          priority: 'High',
         },
         {
           title: 'Valid Parentheses',
           difficulty: 'Easy',
           topic: 'Stack',
           url: 'https://leetcode.com/problems/valid-parentheses/',
-          priority: 'High'
+          priority: 'High',
         },
         {
           title: 'Merge Two Sorted Lists',
           difficulty: 'Easy',
           topic: 'Linked List',
           url: 'https://leetcode.com/problems/merge-two-sorted-lists/',
-          priority: 'Medium'
+          priority: 'Medium',
         },
         {
           title: 'Binary Search',
           difficulty: 'Easy',
           topic: 'Binary Search',
           url: 'https://leetcode.com/problems/binary-search/',
-          priority: 'High'
+          priority: 'High',
         },
         {
           title: 'Best Time to Buy and Sell Stock',
           difficulty: 'Easy',
           topic: 'Arrays',
           url: 'https://leetcode.com/problems/best-time-to-buy-and-sell-stock/',
-          priority: 'High'
+          priority: 'High',
         },
         {
           title: 'Valid Anagram',
           difficulty: 'Easy',
           topic: 'Hashing',
           url: 'https://leetcode.com/problems/valid-anagram/',
-          priority: 'Medium'
+          priority: 'Medium',
         },
         {
           title: 'Longest Substring Without Repeating Characters',
           difficulty: 'Medium',
           topic: 'Sliding Window',
           url: 'https://leetcode.com/problems/longest-substring-without-repeating-characters/',
-          priority: 'High'
+          priority: 'High',
         },
         {
           title: 'Container With Most Water',
           difficulty: 'Medium',
           topic: 'Two Pointers',
           url: 'https://leetcode.com/problems/container-with-most-water/',
-          priority: 'Medium'
+          priority: 'Medium',
         },
         {
           title: 'Product of Array Except Self',
           difficulty: 'Medium',
           topic: 'Arrays',
           url: 'https://leetcode.com/problems/product-of-array-except-self/',
-          priority: 'High'
+          priority: 'High',
         },
         {
           title: 'Maximum Subarray',
           difficulty: 'Medium',
           topic: 'Dynamic Programming',
           url: 'https://leetcode.com/problems/maximum-subarray/',
-          priority: 'High'
+          priority: 'High',
         },
         {
           title: 'Coin Change',
           difficulty: 'Medium',
           topic: 'Dynamic Programming',
           url: 'https://leetcode.com/problems/coin-change/',
-          priority: 'Medium'
+          priority: 'Medium',
         },
         {
           title: 'LRU Cache',
           difficulty: 'Medium',
           topic: 'Design',
           url: 'https://leetcode.com/problems/lru-cache/',
-          priority: 'High'
+          priority: 'High',
         },
       ],
       system_design_topics: [
@@ -145,51 +147,43 @@ export default function InterviewPrep({ job, onClose }: InterviewPrepProps) {
           resources: [
             'System Design Primer (GitHub)',
             'Designing Data-Intensive Applications (Book)',
-            'Grokking System Design Interview'
+            'Grokking System Design Interview',
           ],
-          estimatedTime: '2-3 weeks'
+          estimatedTime: '2-3 weeks',
         },
         {
           title: 'Design URL Shortener',
-          description: 'Classic system design problem covering hashing, database design, and scaling',
+          description:
+            'Classic system design problem covering hashing, database design, and scaling',
           resources: [
             'System Design Interview - URL Shortener',
-            'YouTube: System Design URL Shortener'
+            'YouTube: System Design URL Shortener',
           ],
-          estimatedTime: '3-4 hours'
+          estimatedTime: '3-4 hours',
         },
         {
           title: 'Design Social Media Feed',
           description: 'Learn about fan-out, caching strategies, and real-time updates',
-          resources: [
-            'Designing Instagram/Twitter Feed',
-            'System Design: News Feed'
-          ],
-          estimatedTime: '4-5 hours'
+          resources: ['Designing Instagram/Twitter Feed', 'System Design: News Feed'],
+          estimatedTime: '4-5 hours',
         },
         {
           title: 'Design Rate Limiter',
           description: 'Understanding API rate limiting, token bucket, and distributed systems',
-          resources: [
-            'Rate Limiting Algorithms',
-            'System Design: API Rate Limiter'
-          ],
-          estimatedTime: '2-3 hours'
+          resources: ['Rate Limiting Algorithms', 'System Design: API Rate Limiter'],
+          estimatedTime: '2-3 hours',
         },
         {
           title: 'Design Distributed Cache',
           description: 'Learn about consistent hashing, cache eviction policies, and Redis',
-          resources: [
-            'Designing a Distributed Cache',
-            'Redis Documentation'
-          ],
-          estimatedTime: '3-4 hours'
+          resources: ['Designing a Distributed Cache', 'Redis Documentation'],
+          estimatedTime: '3-4 hours',
         },
       ],
       behavioral_questions: [
         'Tell me about a time you faced a challenging technical problem. How did you solve it?',
         'Describe a situation where you had to work with a difficult team member.',
-        'Tell me about a project you\'re most proud of and why.',
+        "Tell me about a project you're most proud of and why.",
         'How do you handle tight deadlines and pressure?',
         'Describe a time when you had to learn a new technology quickly.',
         'Tell me about a time you made a mistake. How did you handle it?',
@@ -198,25 +192,33 @@ export default function InterviewPrep({ job, onClose }: InterviewPrepProps) {
         'Tell me about a time you disagreed with a technical decision. What did you do?',
         'How do you stay updated with new technologies and industry trends?',
       ],
-      timeline: '4-6 weeks of focused preparation'
+      timeline: '4-6 weeks of focused preparation',
     }
   }
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'Easy': return '#10b981'
-      case 'Medium': return '#f59e0b'
-      case 'Hard': return '#ef4444'
-      default: return '#6b7280'
+      case 'Easy':
+        return '#10b981'
+      case 'Medium':
+        return '#f59e0b'
+      case 'Hard':
+        return '#ef4444'
+      default:
+        return '#6b7280'
     }
   }
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'High': return '#ef4444'
-      case 'Medium': return '#f59e0b'
-      case 'Low': return '#10b981'
-      default: return '#6b7280'
+      case 'High':
+        return '#ef4444'
+      case 'Medium':
+        return '#f59e0b'
+      case 'Low':
+        return '#10b981'
+      default:
+        return '#6b7280'
     }
   }
 
@@ -226,9 +228,13 @@ export default function InterviewPrep({ job, onClose }: InterviewPrepProps) {
         <div className="modal-header">
           <div>
             <h2>Interview Preparation Plan</h2>
-            <p className="job-subtitle">{job.title} at {job.company}</p>
+            <p className="job-subtitle">
+              {job.title} at {job.company}
+            </p>
           </div>
-          <button className="close-btn" onClick={onClose}>×</button>
+          <button className="close-btn" onClick={onClose}>
+            ×
+          </button>
         </div>
 
         {loading ? (

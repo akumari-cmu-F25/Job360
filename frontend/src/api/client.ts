@@ -14,10 +14,39 @@ export const api = {
   uploadResume: async (file: File) => {
     const formData = new FormData()
     formData.append('file', file)
-    const response = await client.post('/api/resume/upload', formData, {
+
+    // Start the upload
+    const startResponse = await client.post('/api/resume/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    return response.data
+
+    if (!startResponse.data.success) {
+      return startResponse.data
+    }
+
+    const uploadId = startResponse.data.upload_id
+
+    // Poll for the result
+    const maxAttempts = 300 // 5 minutes with 1 second intervals
+    let attempts = 0
+
+    while (attempts < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 1000)) // Wait 1 second
+
+      const resultResponse = await client.get(`/api/resume/upload/${uploadId}`)
+      const result = resultResponse.data
+
+      if (result.success !== false || result.status !== 'processing') {
+        return result
+      }
+
+      attempts++
+    }
+
+    return {
+      success: false,
+      error: 'Resume upload timeout',
+    }
   },
 
   exportResume: async (profile: any) => {
@@ -36,14 +65,42 @@ export const api = {
   },
 
   applyToJob: async (job: any, profile: any) => {
-    const response = await client.post('/api/jobs/apply', {
+    // Start the job processing
+    const startResponse = await client.post('/api/jobs/apply', {
       job_id: job.id || job.url,
       job_url: job.url,
       job_description: job.description || '', // Always include description
       profile_data: profile,
       job: job, // Include full job object for fallback
     })
-    return response.data
+
+    if (!startResponse.data.success) {
+      return startResponse.data
+    }
+
+    const jobId = startResponse.data.job_id
+
+    // Poll for the result
+    const maxAttempts = 300 // 5 minutes with 1 second intervals
+    let attempts = 0
+
+    while (attempts < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 1000)) // Wait 1 second
+
+      const resultResponse = await client.get(`/api/jobs/apply/${jobId}`)
+      const result = resultResponse.data
+
+      if (result.success !== false || result.status !== 'processing') {
+        return result
+      }
+
+      attempts++
+    }
+
+    return {
+      success: false,
+      error: 'Job processing timeout',
+    }
   },
 
   // Voice operations
