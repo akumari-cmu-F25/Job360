@@ -193,6 +193,11 @@ Identify what the role emphasizes (e.g., building scalable systems, research, pr
         # Collect all skills
         all_skills = [s.skill for s in required_skills] + [s.skill for s in preferred_skills]
         
+        # Ensure education_requirements is always a list
+        education_reqs = structured_data.get("education_requirements")
+        if not isinstance(education_reqs, list):
+            education_reqs = []
+        
         jd = JobDescription(
             title=structured_data.get("title"),
             company=structured_data.get("company"),
@@ -202,7 +207,7 @@ Identify what the role emphasizes (e.g., building scalable systems, research, pr
             all_skills=all_skills,
             responsibilities=responsibilities,
             experience_years=structured_data.get("experience_years"),
-            education_requirements=structured_data.get("education_requirements", []),
+            education_requirements=education_reqs,
             emphasis_areas=structured_data.get("emphasis_areas", []),
             priorities=structured_data.get("priorities", {}),
             raw_text=raw_text

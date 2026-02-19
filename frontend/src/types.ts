@@ -56,4 +56,5 @@ export interface Job {
   source?: string
   status?: 'queued' | 'processing' | 'completed' | 'error'
   edited_profile?: Profile
+  accepted?: boolean
 }

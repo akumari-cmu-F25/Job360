@@ -87,13 +87,31 @@ class JobFetcher:
             "date_posted": "today" if hours_ago <= 24 else "3days",
         }
 
-        try:
-            response = requests.get(JSEARCH_URL, headers=headers, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-        except Exception as e:
-            logger.error(f"JSearch request failed: {e}")
-            return []
+        # Retry logic with exponential backoff
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = requests.get(JSEARCH_URL, headers=headers, params=params, timeout=30)
+                response.raise_for_status()
+                data = response.json()
+                return self._parse_jsearch_results(data)
+            except requests.exceptions.Timeout:
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # 1s, 2s, 4s
+                    logger.warning(f"JSearch timeout (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s...")
+                    import time
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"JSearch request failed after {max_retries} attempts: timeout")
+                    return []
+            except Exception as e:
+                logger.error(f"JSearch request failed: {e}")
+                return []
+        
+        return []
+    
+    def _parse_jsearch_results(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Parse JSearch API response into job list."""
 
         jobs = []
         for item in data.get("data", []):
@@ -106,7 +124,6 @@ class JobFetcher:
                 "source": item.get("job_publisher", "JSearch"),
                 "description": item.get("job_description", ""),
             })
-
         return jobs
     
     def _deduplicate_jobs(self, jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

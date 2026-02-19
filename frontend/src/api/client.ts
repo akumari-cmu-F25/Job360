@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000'
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -113,7 +113,12 @@ export const api = {
   },
 
   // LinkedIn referral message
-  generateLinkedInMessage: async (job: any, profile: any, tone: string, customRequirements?: string) => {
+  generateLinkedInMessage: async (
+    job: any,
+    profile: any,
+    tone: string,
+    customRequirements?: string
+  ) => {
     const response = await client.post('/api/linkedin/generate-message', {
       job,
       profile,
