@@ -405,14 +405,45 @@ Return a comprehensive plan with many actions.
                 if proj.bullets:
                     logger.info(f"FORCING rewrite of {len(proj.bullets)} bullets for project {proj.name}")
                     for i, bullet in enumerate(proj.bullets):
+                        original_bullet = bullet
+                        new_bullet = None
+                        evaluation_passed = False
+                        
                         if jd:
                             keywords = jd.get_priority_skills(top_n=5)
                             new_bullet = await self._rewrite_bullet_async(bullet, keywords)
+                            
+                            # Evaluate relevance
+                            if new_bullet:
+                                evaluation_passed = await self._evaluate_bullet_relevance(
+                                    original_bullet=original_bullet,
+                                    rewritten_bullet=new_bullet,
+                                    jd=jd,
+                                    keywords=keywords
+                                )
+                                
+                                if not evaluation_passed:
+                                    # Try with fewer keywords
+                                    reduced_keywords = keywords[:3]
+                                    new_bullet = await self._rewrite_bullet_async(bullet, reduced_keywords)
+                                    if new_bullet:
+                                        evaluation_passed = await self._evaluate_bullet_relevance(
+                                            original_bullet=original_bullet,
+                                            rewritten_bullet=new_bullet,
+                                            jd=jd,
+                                            keywords=reduced_keywords
+                                        )
                         else:
                             # Even without JD, improve the bullet
                             new_bullet = await self._improve_bullet_generally(bullet)
-                        if new_bullet:
+                            evaluation_passed = True  # Accept general improvement
+                        
+                        # Only apply if evaluation passed or no JD
+                        if new_bullet and (evaluation_passed or not jd):
                             proj.bullets[i] = new_bullet
+                            logger.debug(f"✓ Applied project bullet {i} for {proj.name}")
+                        elif new_bullet and not evaluation_passed:
+                            logger.warning(f"✗ Rejected project bullet {i} for {proj.name} - failed relevance evaluation")
         
         # 4. Update skills section - FORCE THIS
         if edited_profile.skills:
@@ -668,32 +699,74 @@ Return only the rewritten description.
                     original_bullet = bullet
                     new_bullet = None
                     
-                    # Use bullet rewriting with keywords
-                    if jd and relevant_keywords:
-                        # Use JD keywords for rewriting
-                        new_bullet = await self._rewrite_bullet_async(bullet, relevant_keywords)
-                    elif relevant_keywords:
-                        new_bullet = await self._rewrite_bullet_async(bullet, relevant_keywords)
-                    else:
-                        # Fallback to general improvement
-                        new_bullet = await self._improve_bullet_generally(bullet)
+                    # Use bullet rewriting with keywords and evaluation
+                    max_attempts = 3
+                    attempt = 0
+                    new_bullet = None
+                    evaluation_passed = False
+                    
+                    while attempt < max_attempts and not evaluation_passed:
+                        attempt += 1
+                        
+                        # Use bullet rewriting with keywords
+                        if jd and relevant_keywords:
+                            # Use JD keywords for rewriting
+                            new_bullet = await self._rewrite_bullet_async(bullet, relevant_keywords)
+                        elif relevant_keywords:
+                            new_bullet = await self._rewrite_bullet_async(bullet, relevant_keywords)
+                        else:
+                            # Fallback to general improvement
+                            new_bullet = await self._improve_bullet_generally(bullet)
+                        
+                        # Evaluate if the rewrite is relevant to JD
+                        if new_bullet and jd:
+                            evaluation_passed = await self._evaluate_bullet_relevance(
+                                original_bullet=original_bullet,
+                                rewritten_bullet=new_bullet,
+                                jd=jd,
+                                keywords=relevant_keywords
+                            )
+                            
+                            if not evaluation_passed:
+                                logger.debug(f"Bullet rewrite attempt {attempt} failed evaluation for {exp.title} bullet {i}")
+                                # Try with fewer keywords or different approach
+                                if attempt < max_attempts:
+                                    # Reduce keywords for next attempt
+                                    relevant_keywords = relevant_keywords[:max(2, len(relevant_keywords) - 2)]
+                                    if not relevant_keywords and jd:
+                                        relevant_keywords = jd.get_priority_skills(top_n=3)
+                        else:
+                            # If no JD, accept the rewrite
+                            evaluation_passed = True
                     
                     # Fallback if enhanced rewrite didn't work
                     if not new_bullet or not new_bullet.strip() or new_bullet.strip().lower() == original_bullet.strip().lower():
                         logger.debug(f"Enhanced rewrite didn't change bullet {i}, trying standard rewrite...")
                         if relevant_keywords:
                             new_bullet = await self._rewrite_bullet_async(bullet, relevant_keywords)
+                            if new_bullet and jd:
+                                evaluation_passed = await self._evaluate_bullet_relevance(
+                                    original_bullet=original_bullet,
+                                    rewritten_bullet=new_bullet,
+                                    jd=jd,
+                                    keywords=relevant_keywords
+                                )
                     
-                    # Final fallback
-                    if not new_bullet or new_bullet.strip().lower() == original_bullet.strip().lower():
-                        logger.debug(f"Standard rewrite didn't change bullet {i}, trying general improvement...")
+                    # Final fallback - only if evaluation passed or no JD
+                    if not evaluation_passed and jd:
+                        logger.debug(f"Standard rewrite failed evaluation, trying general improvement...")
                         new_bullet = await self._improve_bullet_generally(original_bullet)
+                        # Don't evaluate general improvement - it's a fallback
+                        evaluation_passed = True
                     
-                    # Apply the change if we got something different
+                    # Apply the change only if evaluation passed or no JD to evaluate against
                     if new_bullet and new_bullet.strip() and new_bullet.strip().lower() != original_bullet.strip().lower():
-                        exp.bullets[i] = new_bullet
-                        bullets_rewritten += 1
-                        logger.debug(f"Rewrote bullet {i} for {exp.title}")
+                        if evaluation_passed or not jd:
+                            exp.bullets[i] = new_bullet
+                            bullets_rewritten += 1
+                            logger.debug(f"✓ Rewrote bullet {i} for {exp.title} (evaluation: {'passed' if evaluation_passed else 'no JD'})")
+                        else:
+                            logger.warning(f"✗ Rejected bullet {i} for {exp.title} - failed relevance evaluation")
                     else:
                         logger.warning(f"Could not rewrite bullet {i} for {exp.title} - all attempts failed")
         
@@ -731,14 +804,43 @@ Return only the rewritten description.
                     
                     new_bullet = await self._rewrite_bullet_async(bullet, relevant_keywords)
                     
-                    # Fallback if rewrite didn't change
-                    if not new_bullet or new_bullet.strip().lower() == original_bullet.strip().lower():
-                        new_bullet = await self._improve_bullet_generally(original_bullet)
+                    # Evaluate if the rewrite is relevant to JD
+                    evaluation_passed = False
+                    if new_bullet and jd:
+                        evaluation_passed = await self._evaluate_bullet_relevance(
+                            original_bullet=original_bullet,
+                            rewritten_bullet=new_bullet,
+                            jd=jd,
+                            keywords=relevant_keywords
+                        )
+                        
+                        if not evaluation_passed:
+                            logger.debug(f"Project bullet rewrite failed evaluation, trying again...")
+                            # Try with fewer keywords
+                            reduced_keywords = relevant_keywords[:max(2, len(relevant_keywords) - 1)]
+                            if reduced_keywords:
+                                new_bullet = await self._rewrite_bullet_async(bullet, reduced_keywords)
+                                if new_bullet:
+                                    evaluation_passed = await self._evaluate_bullet_relevance(
+                                        original_bullet=original_bullet,
+                                        rewritten_bullet=new_bullet,
+                                        jd=jd,
+                                        keywords=reduced_keywords
+                                    )
                     
+                    # Fallback if rewrite didn't change or failed evaluation
+                    if not new_bullet or not new_bullet.strip() or new_bullet.strip().lower() == original_bullet.strip().lower():
+                        new_bullet = await self._improve_bullet_generally(original_bullet)
+                        evaluation_passed = True  # Accept general improvement as fallback
+                    
+                    # Only apply if evaluation passed or no JD
                     if new_bullet and new_bullet.strip() and new_bullet.strip().lower() != original_bullet.strip().lower():
-                        proj.bullets[i] = new_bullet
-                        proj_bullets_rewritten += 1
-                        logger.debug(f"✓ Rewrote project bullet {i} for {proj.name}")
+                        if evaluation_passed or not jd:
+                            proj.bullets[i] = new_bullet
+                            proj_bullets_rewritten += 1
+                            logger.debug(f"✓ Rewrote project bullet {i} for {proj.name} (evaluation: {'passed' if evaluation_passed else 'no JD'})")
+                        else:
+                            logger.warning(f"✗ Rejected project bullet {i} for {proj.name} - failed relevance evaluation")
         
         logger.info(f"Rewrote {proj_bullets_rewritten} project bullets total")
         
@@ -1111,6 +1213,92 @@ Return only the rewritten bullet point.
         except Exception as e:
             logger.warning(f"Failed to rewrite bullet: {e}")
             return None
+    
+    async def _evaluate_bullet_relevance(
+        self,
+        original_bullet: str,
+        rewritten_bullet: str,
+        jd: JobDescription,
+        keywords: List[str]
+    ) -> bool:
+        """
+        Evaluate if the rewritten bullet is relevant to JD and keywords.
+        Only updates that are relevant should be kept.
+        
+        Returns:
+            True if the rewrite is relevant and should be kept, False otherwise
+        """
+        if not jd or not keywords:
+            return True  # If no JD, accept the rewrite
+        
+        # Extract key information from JD
+        jd_keywords = jd.get_priority_skills(top_n=10)
+        jd_requirements = jd.required_skills[:5] if jd.required_skills else []
+        jd_title = jd.title or ""
+        jd_company = jd.company or ""
+        
+        # Build evaluation prompt
+        prompt = f"""Evaluate if this rewritten resume bullet is RELEVANT to the job description and keywords.
+
+JOB DESCRIPTION:
+Title: {jd_title}
+Company: {jd_company}
+Priority Keywords: {', '.join(jd_keywords[:10])}
+Required Skills: {', '.join([s.skill for s in jd_requirements])}
+
+ORIGINAL BULLET:
+{original_bullet}
+
+REWRITTEN BULLET:
+{rewritten_bullet}
+
+KEYWORDS USED IN REWRITE:
+{', '.join(keywords[:5])}
+
+EVALUATION CRITERIA:
+1. Is the rewritten bullet RELEVANT to the job description? (Does it relate to the role requirements?)
+2. Does it incorporate the keywords naturally and meaningfully?
+3. Does it maintain the core meaning of the original bullet?
+4. Is it an UNNECESSARY change? (Only update if it adds value related to JD)
+
+IMPORTANT RULES:
+- Only approve if the change is RELEVANT to the JD
+- Do NOT approve unnecessary changes that don't relate to the job
+- Do NOT approve if keywords are forced in without relevance
+- Only approve if the rewrite genuinely improves relevance to the job
+
+Respond with ONLY "APPROVE" or "REJECT" followed by a brief reason (one sentence).
+
+Format: APPROVE/REJECT: [reason]
+"""
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are an expert resume evaluator. Only approve changes that are relevant to the job description. Reject unnecessary or irrelevant changes."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.2,  # Low temperature for consistent evaluation
+                max_tokens=100
+            )
+            
+            evaluation_text = response.choices[0].message.content.strip().upper()
+            
+            # Parse the response
+            if evaluation_text.startswith("APPROVE"):
+                logger.debug(f"✓ Bullet evaluation PASSED: {evaluation_text[:100]}")
+                return True
+            else:
+                logger.debug(f"✗ Bullet evaluation FAILED: {evaluation_text[:100]}")
+                return False
+                
+        except Exception as e:
+            logger.warning(f"Failed to evaluate bullet relevance: {e}")
+            # On error, be conservative - only approve if keywords are present
+            rewritten_lower = rewritten_bullet.lower()
+            has_keywords = any(kw.lower() in rewritten_lower for kw in keywords[:3])
+            return has_keywords
     
     def _summarize_profile(self, profile: Profile) -> str:
         """Create summary of profile for LLM."""
