@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard'
 import LinkedInReferral from './components/LinkedInReferral'
 import InterviewPrep from './components/InterviewPrep'
 import LaunchPage from './components/LaunchPage'
+import Job360Logo from './components/Job360Logo'
 import { Profile, Job } from './types'
 
 type View = 'launch' | 'editor' | 'dashboard'
@@ -50,13 +51,13 @@ function App() {
     <div className="app-container">
       {currentView !== 'launch' && (
         <div className="app-header">
-          <h1
+          <div
             className="app-title"
             onClick={() => setCurrentView('launch')}
             style={{ cursor: 'pointer' }}
           >
-            Job360
-          </h1>
+            <Job360Logo size="small" showText={true} variant="header" />
+          </div>
           <div className="view-toggle">
             <button
               className={`view-btn ${currentView === 'editor' ? 'active' : ''}`}

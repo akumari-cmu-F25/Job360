@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Profile } from '../types'
 import { api } from '../api/client'
+import Job360Logo from './Job360Logo'
 import './LaunchPage.css'
 
 interface LaunchPageProps {
@@ -67,72 +68,74 @@ export default function LaunchPage({ onStartSearch, existingProfile }: LaunchPag
   return (
     <div className="launch-page">
       <div className="launch-header">
-        <h1 className="launch-title">Job360</h1>
-        <p className="launch-subtitle">Tailor your resume to any job in seconds</p>
+        <Job360Logo size="large" showText={true} variant="launch" />
+        <p className="launch-subtitle">One stop solution for all your job application</p>
       </div>
 
       <div className="launch-content">
-        {/* Resume Upload Section */}
-        <div className="upload-section">
-          <div
-            {...getRootProps()}
-            className={`dropzone ${isDragActive ? 'active' : ''} ${profile ? 'uploaded' : ''}`}
-          >
-            <input {...getInputProps()} />
-            {loading ? (
-              <div className="dropzone-content">
-                <div className="spinner"></div>
-                <p>Processing your resume...</p>
-              </div>
-            ) : profile ? (
-              <div className="dropzone-content">
-                <div className="checkmark">✓</div>
-                <p className="file-name">{resumeFileName}</p>
-                <p className="upload-hint">Click to change resume</p>
-              </div>
-            ) : (
-              <div className="dropzone-content">
-                <div className="upload-icon">📄</div>
-                <p className="upload-text">
-                  {isDragActive ? 'Drop your resume here' : 'Upload your resume'}
-                </p>
-                <p className="upload-hint">PDF, DOCX, or DOC • Max 10MB</p>
-              </div>
-            )}
+        <div className="content-panel">
+          {/* Resume Upload Section */}
+          <div className="upload-section">
+            <div
+              {...getRootProps()}
+              className={`dropzone ${isDragActive ? 'active' : ''} ${profile ? 'uploaded' : ''}`}
+            >
+              <input {...getInputProps()} />
+              {loading ? (
+                <div className="dropzone-content">
+                  <div className="spinner"></div>
+                  <p className="upload-text">Processing your resume...</p>
+                </div>
+              ) : profile ? (
+                <div className="dropzone-content">
+                  <div className="checkmark">✓</div>
+                  <p className="file-name">{resumeFileName}</p>
+                  <p className="upload-hint">Click to change resume</p>
+                </div>
+              ) : (
+                <div className="dropzone-content">
+                  <div className="upload-icon">📄</div>
+                  <p className="upload-text">
+                    {isDragActive ? 'Drop your resume here' : 'Upload your resume'}
+                  </p>
+                  <p className="upload-hint">PDF, DOCX, or DOC • Max 10MB</p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Job Category Selection */}
-        <div className="category-section">
-          <label htmlFor="category-select" className="category-label">
-            Select Job Category
-          </label>
-          <select
-            id="category-select"
-            className="category-select"
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
+          {/* Job Category Selection */}
+          <div className="category-section">
+            <label htmlFor="category-select" className="category-label">
+              Select Job Category
+            </label>
+            <select
+              id="category-select"
+              className="category-select"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              <option value="">Choose a category...</option>
+              {JOB_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Error Message */}
+          {error && <div className="error-message">{error}</div>}
+
+          {/* Start Searching Button */}
+          <button
+            className={`start-btn ${isReady ? 'ready' : 'disabled'}`}
+            onClick={handleStartSearch}
+            disabled={!isReady || loading}
           >
-            <option value="">Choose a category...</option>
-            {JOB_CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
+            {loading ? 'Processing...' : 'Start Searching'}
+          </button>
         </div>
-
-        {/* Error Message */}
-        {error && <div className="error-message">{error}</div>}
-
-        {/* Start Searching Button */}
-        <button
-          className={`start-btn ${isReady ? 'ready' : 'disabled'}`}
-          onClick={handleStartSearch}
-          disabled={!isReady || loading}
-        >
-          {loading ? 'Processing...' : 'Start Searching'}
-        </button>
       </div>
     </div>
   )

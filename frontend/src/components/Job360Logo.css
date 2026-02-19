@@ -1,0 +1,26 @@
+.job360-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.logo-text {
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 0.02em;
+  font-family: 'Inter', sans-serif;
+}
+
+.job360-logo.small .logo-text {
+  font-size: 0.875rem;
+}
+
+.job360-logo.medium .logo-text {
+  font-size: 1.25rem;
+}
+
+.job360-logo.large .logo-text {
+  font-size: 2rem;
+  letter-spacing: 0.03em;
+}

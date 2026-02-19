@@ -1,16 +1,18 @@
 """Job Fetcher - Searches and fetches job listings from various sources."""
 
+import http.client
 import requests
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import json
+from urllib.parse import quote
 from src.config import config
 
 logger = logging.getLogger(__name__)
 
-JSEARCH_URL = "https://jsearch.p.rapidapi.com/search"
+JSEARCH_HOST = "jsearch.p.rapidapi.com"
 
 
 class JobFetcher:
@@ -76,45 +78,60 @@ class JobFetcher:
             logger.warning("RAPIDAPI_KEY not set – skipping real job search")
             return []
 
-        headers = {
-            "X-RapidAPI-Key": config.rapidapi_key,
-            "X-RapidAPI-Host": "jsearch.p.rapidapi.com",
-        }
-        params = {
-            "query": f"{term} {location or ''}".strip(),
-            "page": "1",
-            "num_pages": "2",
-            "date_posted": "today" if hours_ago <= 24 else "3days",
-        }
-
-        # Retry logic with exponential backoff
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                response = requests.get(JSEARCH_URL, headers=headers, params=params, timeout=30)
-                response.raise_for_status()
-                data = response.json()
-                return self._parse_jsearch_results(data)
-            except requests.exceptions.Timeout:
-                if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt  # 1s, 2s, 4s
-                    logger.warning(f"JSearch timeout (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s...")
-                    import time
-                    time.sleep(wait_time)
-                else:
-                    logger.error(f"JSearch request failed after {max_retries} attempts: timeout")
-                    return []
-            except Exception as e:
-                logger.error(f"JSearch request failed: {e}")
+        try:
+            # Build query string
+            query = f"{term} {location or ''}".strip()
+            if location:
+                query = f"{term} jobs in {location}"
+            
+            # Determine date_posted parameter
+            if hours_ago <= 24:
+                date_posted = "today"
+            elif hours_ago <= 72:
+                date_posted = "3days"
+            else:
+                date_posted = "all"
+            
+            # Build the request path with query parameters
+            query_encoded = quote(query, safe='')
+            path = f"/search?query={query_encoded}&page=1&num_pages=1&country=us&date_posted={date_posted}"
+            
+            # Create connection
+            conn = http.client.HTTPSConnection(JSEARCH_HOST)
+            
+            # Set headers
+            headers = {
+                'x-rapidapi-key': config.rapidapi_key,
+                'x-rapidapi-host': JSEARCH_HOST
+            }
+            
+            # Make request
+            conn.request("GET", path, headers=headers)
+            
+            # Get response
+            res = conn.getresponse()
+            data = res.read()
+            
+            # Check status
+            if res.status != 200:
+                logger.error(f"JSearch request failed: HTTP {res.status} - {data.decode('utf-8')}")
+                conn.close()
                 return []
-        
-        return []
-    
-    def _parse_jsearch_results(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Parse JSearch API response into job list."""
+            
+            # Parse JSON response
+            response_data = json.loads(data.decode("utf-8"))
+            conn.close()
+            
+        except Exception as e:
+            logger.error(f"JSearch request failed: {e}")
+            try:
+                conn.close()
+            except:
+                pass
+            return []
 
         jobs = []
-        for item in data.get("data", []):
+        for item in response_data.get("data", []):
             jobs.append({
                 "title": item.get("job_title"),
                 "company": item.get("employer_name"),
@@ -124,6 +141,7 @@ class JobFetcher:
                 "source": item.get("job_publisher", "JSearch"),
                 "description": item.get("job_description", ""),
             })
+
         return jobs
     
     def _deduplicate_jobs(self, jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
