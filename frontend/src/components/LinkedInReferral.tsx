@@ -31,13 +31,15 @@ export default function LinkedInReferral({ job, profile, onClose }: LinkedInRefe
 
   useEffect(() => {
     if (!job.company) return
+    let cancelled = false
     setEmployeesLoading(true)
     api.getCompanyEmployees(job.company)
       .then((result) => {
-        if (result.success) setEmployees(result.employees)
+        if (!cancelled && result.success) setEmployees(result.employees)
       })
       .catch(() => {/* silently hide section on error */})
-      .finally(() => setEmployeesLoading(false))
+      .finally(() => { if (!cancelled) setEmployeesLoading(false) })
+    return () => { cancelled = true }
   }, [job.company])
 
   const generateMessage = async () => {

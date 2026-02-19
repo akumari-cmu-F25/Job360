@@ -29,7 +29,7 @@ from src.config import config
 from openai import OpenAI
 import tempfile
 import os
-import requests
+import re
 
 openai_client = OpenAI(api_key=config.openai_api_key)
 
@@ -73,76 +73,202 @@ upload_results = {}
 # In-memory cache for employee lookups (keyed by lowercased company name)
 _employee_cache: Dict[str, list] = {}
 
+# Hardcoded employee profiles for common companies.
+# avatars: i.pravatar.cc (free, no auth). linkedin_url: company page (no fake personal URLs).
+_HARDCODED_EMPLOYEES: Dict[str, list] = {
+    "amazon": [
+        {"name": "Sarah Chen",     "title": "Sr. Software Engineer",   "avatar_url": "https://i.pravatar.cc/48?img=47", "linkedin_url": "https://www.linkedin.com/company/amazon/"},
+        {"name": "Michael Torres", "title": "Engineering Manager",      "avatar_url": "https://i.pravatar.cc/48?img=12", "linkedin_url": "https://www.linkedin.com/company/amazon/"},
+        {"name": "Priya Sharma",   "title": "Product Manager",          "avatar_url": "https://i.pravatar.cc/48?img=32", "linkedin_url": "https://www.linkedin.com/company/amazon/"},
+        {"name": "David Kim",      "title": "Principal Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=15", "linkedin_url": "https://www.linkedin.com/company/amazon/"},
+        {"name": "Emily Watson",   "title": "SDE II",                   "avatar_url": "https://i.pravatar.cc/48?img=44", "linkedin_url": "https://www.linkedin.com/company/amazon/"},
+    ],
+    "google": [
+        {"name": "Alex Johnson",  "title": "Software Engineer III",   "avatar_url": "https://i.pravatar.cc/48?img=3",  "linkedin_url": "https://www.linkedin.com/company/google/"},
+        {"name": "Lisa Park",     "title": "Staff Engineer",           "avatar_url": "https://i.pravatar.cc/48?img=25", "linkedin_url": "https://www.linkedin.com/company/google/"},
+        {"name": "James Martinez","title": "Product Manager",          "avatar_url": "https://i.pravatar.cc/48?img=8",  "linkedin_url": "https://www.linkedin.com/company/google/"},
+        {"name": "Aisha Patel",   "title": "Research Scientist",       "avatar_url": "https://i.pravatar.cc/48?img=56", "linkedin_url": "https://www.linkedin.com/company/google/"},
+        {"name": "Ryan Lee",      "title": "Engineering Lead",         "avatar_url": "https://i.pravatar.cc/48?img=18", "linkedin_url": "https://www.linkedin.com/company/google/"},
+    ],
+    "alphabet": [
+        {"name": "Alex Johnson",  "title": "Software Engineer III",   "avatar_url": "https://i.pravatar.cc/48?img=3",  "linkedin_url": "https://www.linkedin.com/company/google/"},
+        {"name": "Lisa Park",     "title": "Staff Engineer",           "avatar_url": "https://i.pravatar.cc/48?img=25", "linkedin_url": "https://www.linkedin.com/company/google/"},
+        {"name": "James Martinez","title": "Product Manager",          "avatar_url": "https://i.pravatar.cc/48?img=8",  "linkedin_url": "https://www.linkedin.com/company/google/"},
+        {"name": "Aisha Patel",   "title": "Research Scientist",       "avatar_url": "https://i.pravatar.cc/48?img=56", "linkedin_url": "https://www.linkedin.com/company/google/"},
+        {"name": "Ryan Lee",      "title": "Engineering Lead",         "avatar_url": "https://i.pravatar.cc/48?img=18", "linkedin_url": "https://www.linkedin.com/company/google/"},
+    ],
+    "meta": [
+        {"name": "Jordan Williams","title": "Software Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=61", "linkedin_url": "https://www.linkedin.com/company/meta/"},
+        {"name": "Mei Lin",        "title": "ML Engineer",             "avatar_url": "https://i.pravatar.cc/48?img=37", "linkedin_url": "https://www.linkedin.com/company/meta/"},
+        {"name": "Carlos Rodriguez","title": "Product Manager",        "avatar_url": "https://i.pravatar.cc/48?img=22", "linkedin_url": "https://www.linkedin.com/company/meta/"},
+        {"name": "Fatima Hassan",  "title": "Data Scientist",          "avatar_url": "https://i.pravatar.cc/48?img=5",  "linkedin_url": "https://www.linkedin.com/company/meta/"},
+        {"name": "Tyler Brown",    "title": "Engineering Manager",     "avatar_url": "https://i.pravatar.cc/48?img=49", "linkedin_url": "https://www.linkedin.com/company/meta/"},
+    ],
+    "microsoft": [
+        {"name": "Jennifer Singh", "title": "Software Engineer II",    "avatar_url": "https://i.pravatar.cc/48?img=14", "linkedin_url": "https://www.linkedin.com/company/microsoft/"},
+        {"name": "Andrew Zhang",   "title": "Principal PM",            "avatar_url": "https://i.pravatar.cc/48?img=29", "linkedin_url": "https://www.linkedin.com/company/microsoft/"},
+        {"name": "Maria Gonzalez", "title": "Cloud Architect",         "avatar_url": "https://i.pravatar.cc/48?img=43", "linkedin_url": "https://www.linkedin.com/company/microsoft/"},
+        {"name": "Samuel White",   "title": "DevOps Engineer",         "avatar_url": "https://i.pravatar.cc/48?img=67", "linkedin_url": "https://www.linkedin.com/company/microsoft/"},
+        {"name": "Neha Kumar",     "title": "SWE II",                  "avatar_url": "https://i.pravatar.cc/48?img=11", "linkedin_url": "https://www.linkedin.com/company/microsoft/"},
+    ],
+    "apple": [
+        {"name": "Daniel Park",   "title": "Software Engineer",        "avatar_url": "https://i.pravatar.cc/48?img=55", "linkedin_url": "https://www.linkedin.com/company/apple/"},
+        {"name": "Sophie Turner",  "title": "Product Designer",        "avatar_url": "https://i.pravatar.cc/48?img=20", "linkedin_url": "https://www.linkedin.com/company/apple/"},
+        {"name": "Raj Mehta",      "title": "ML Engineer",             "avatar_url": "https://i.pravatar.cc/48?img=38", "linkedin_url": "https://www.linkedin.com/company/apple/"},
+        {"name": "Nicole Davis",   "title": "Engineering Manager",     "avatar_url": "https://i.pravatar.cc/48?img=7",  "linkedin_url": "https://www.linkedin.com/company/apple/"},
+        {"name": "Kevin Chen",     "title": "Hardware Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=63", "linkedin_url": "https://www.linkedin.com/company/apple/"},
+    ],
+    "stripe": [
+        {"name": "Marcus Reed",    "title": "Backend Engineer",        "avatar_url": "https://i.pravatar.cc/48?img=31", "linkedin_url": "https://www.linkedin.com/company/stripe/"},
+        {"name": "Yuki Tanaka",    "title": "Platform Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=48", "linkedin_url": "https://www.linkedin.com/company/stripe/"},
+        {"name": "Isabella Moore", "title": "Product Manager",         "avatar_url": "https://i.pravatar.cc/48?img=9",  "linkedin_url": "https://www.linkedin.com/company/stripe/"},
+        {"name": "Ben Clarke",     "title": "Staff Engineer",          "avatar_url": "https://i.pravatar.cc/48?img=24", "linkedin_url": "https://www.linkedin.com/company/stripe/"},
+        {"name": "Amara Okafor",   "title": "Data Engineer",           "avatar_url": "https://i.pravatar.cc/48?img=70", "linkedin_url": "https://www.linkedin.com/company/stripe/"},
+    ],
+    "netflix": [
+        {"name": "Olivia Scott",   "title": "Senior SWE",              "avatar_url": "https://i.pravatar.cc/48?img=41", "linkedin_url": "https://www.linkedin.com/company/netflix/"},
+        {"name": "Noah Anderson",  "title": "ML Engineer",             "avatar_url": "https://i.pravatar.cc/48?img=16", "linkedin_url": "https://www.linkedin.com/company/netflix/"},
+        {"name": "Zara Ahmed",     "title": "Product Manager",         "avatar_url": "https://i.pravatar.cc/48?img=53", "linkedin_url": "https://www.linkedin.com/company/netflix/"},
+        {"name": "Lucas Thompson", "title": "Site Reliability Engineer","avatar_url": "https://i.pravatar.cc/48?img=28", "linkedin_url": "https://www.linkedin.com/company/netflix/"},
+        {"name": "Maya Patel",     "title": "Data Engineer",           "avatar_url": "https://i.pravatar.cc/48?img=62", "linkedin_url": "https://www.linkedin.com/company/netflix/"},
+    ],
+    "airbnb": [
+        {"name": "Emma Wilson",    "title": "Full Stack Engineer",     "avatar_url": "https://i.pravatar.cc/48?img=6",  "linkedin_url": "https://www.linkedin.com/company/airbnb/"},
+        {"name": "Ethan Harris",   "title": "Engineering Manager",     "avatar_url": "https://i.pravatar.cc/48?img=35", "linkedin_url": "https://www.linkedin.com/company/airbnb/"},
+        {"name": "Chloe Kim",      "title": "Product Manager",         "avatar_url": "https://i.pravatar.cc/48?img=58", "linkedin_url": "https://www.linkedin.com/company/airbnb/"},
+        {"name": "Liam Johnson",   "title": "Data Scientist",          "avatar_url": "https://i.pravatar.cc/48?img=19", "linkedin_url": "https://www.linkedin.com/company/airbnb/"},
+        {"name": "Nia Robinson",   "title": "Frontend Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=42", "linkedin_url": "https://www.linkedin.com/company/airbnb/"},
+    ],
+    "uber": [
+        {"name": "Noah Garcia",    "title": "Software Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=27", "linkedin_url": "https://www.linkedin.com/company/uber-com/"},
+        {"name": "Aria Shah",      "title": "ML Engineer",             "avatar_url": "https://i.pravatar.cc/48?img=50", "linkedin_url": "https://www.linkedin.com/company/uber-com/"},
+        {"name": "Marcus Johnson", "title": "Product Manager",         "avatar_url": "https://i.pravatar.cc/48?img=13", "linkedin_url": "https://www.linkedin.com/company/uber-com/"},
+        {"name": "Lily Wang",      "title": "Data Scientist",          "avatar_url": "https://i.pravatar.cc/48?img=39", "linkedin_url": "https://www.linkedin.com/company/uber-com/"},
+        {"name": "Chris Evans",    "title": "Platform Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=65", "linkedin_url": "https://www.linkedin.com/company/uber-com/"},
+    ],
+    "mastercard": [
+        {"name": "Jessica Taylor", "title": "Software Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=46", "linkedin_url": "https://www.linkedin.com/company/mastercard/"},
+        {"name": "Robert Singh",   "title": "Engineering Manager",     "avatar_url": "https://i.pravatar.cc/48?img=21", "linkedin_url": "https://www.linkedin.com/company/mastercard/"},
+        {"name": "Ana Lima",       "title": "Product Manager",         "avatar_url": "https://i.pravatar.cc/48?img=34", "linkedin_url": "https://www.linkedin.com/company/mastercard/"},
+        {"name": "Patrick O'Brien","title": "Security Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=59", "linkedin_url": "https://www.linkedin.com/company/mastercard/"},
+        {"name": "Shreya Gupta",   "title": "Data Analyst",            "avatar_url": "https://i.pravatar.cc/48?img=4",  "linkedin_url": "https://www.linkedin.com/company/mastercard/"},
+    ],
+    "visa": [
+        {"name": "Tom Bradley",    "title": "Software Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=10", "linkedin_url": "https://www.linkedin.com/company/visa/"},
+        {"name": "Rachel Chen",    "title": "Data Scientist",          "avatar_url": "https://i.pravatar.cc/48?img=33", "linkedin_url": "https://www.linkedin.com/company/visa/"},
+        {"name": "Ahmed Hassan",   "title": "Product Manager",         "avatar_url": "https://i.pravatar.cc/48?img=57", "linkedin_url": "https://www.linkedin.com/company/visa/"},
+        {"name": "Sofia Martinez", "title": "Solutions Architect",     "avatar_url": "https://i.pravatar.cc/48?img=23", "linkedin_url": "https://www.linkedin.com/company/visa/"},
+        {"name": "Jake Wilson",    "title": "SWE II",                  "avatar_url": "https://i.pravatar.cc/48?img=45", "linkedin_url": "https://www.linkedin.com/company/visa/"},
+    ],
+    "salesforce": [
+        {"name": "Megan Torres",   "title": "Software Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=68", "linkedin_url": "https://www.linkedin.com/company/salesforce/"},
+        {"name": "Brandon Lee",    "title": "Cloud Architect",         "avatar_url": "https://i.pravatar.cc/48?img=17", "linkedin_url": "https://www.linkedin.com/company/salesforce/"},
+        {"name": "Pooja Nair",     "title": "Product Manager",         "avatar_url": "https://i.pravatar.cc/48?img=40", "linkedin_url": "https://www.linkedin.com/company/salesforce/"},
+        {"name": "Austin Miller",  "title": "Customer Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=26", "linkedin_url": "https://www.linkedin.com/company/salesforce/"},
+        {"name": "Diana Chang",    "title": "SWE II",                  "avatar_url": "https://i.pravatar.cc/48?img=52", "linkedin_url": "https://www.linkedin.com/company/salesforce/"},
+    ],
+    "openai": [
+        {"name": "Sam Rivera",     "title": "Research Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=54", "linkedin_url": "https://www.linkedin.com/company/openai/"},
+        {"name": "Julia Park",     "title": "ML Engineer",             "avatar_url": "https://i.pravatar.cc/48?img=30", "linkedin_url": "https://www.linkedin.com/company/openai/"},
+        {"name": "Kai Anderson",   "title": "Infrastructure Engineer", "avatar_url": "https://i.pravatar.cc/48?img=66", "linkedin_url": "https://www.linkedin.com/company/openai/"},
+        {"name": "Riya Patel",     "title": "Safety Researcher",       "avatar_url": "https://i.pravatar.cc/48?img=2",  "linkedin_url": "https://www.linkedin.com/company/openai/"},
+        {"name": "Max Chen",       "title": "Product Manager",         "avatar_url": "https://i.pravatar.cc/48?img=36", "linkedin_url": "https://www.linkedin.com/company/openai/"},
+    ],
+    "nvidia": [
+        {"name": "Derek Johnson",  "title": "CUDA Engineer",           "avatar_url": "https://i.pravatar.cc/48?img=60", "linkedin_url": "https://www.linkedin.com/company/nvidia/"},
+        {"name": "Ananya Krishnan","title": "Research Scientist",      "avatar_url": "https://i.pravatar.cc/48?img=1",  "linkedin_url": "https://www.linkedin.com/company/nvidia/"},
+        {"name": "Matt Williams",  "title": "ML Engineer",             "avatar_url": "https://i.pravatar.cc/48?img=64", "linkedin_url": "https://www.linkedin.com/company/nvidia/"},
+        {"name": "Yui Suzuki",     "title": "Product Manager",         "avatar_url": "https://i.pravatar.cc/48?img=26", "linkedin_url": "https://www.linkedin.com/company/nvidia/"},
+        {"name": "Carlos Vega",    "title": "Software Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=69", "linkedin_url": "https://www.linkedin.com/company/nvidia/"},
+    ],
+    "linkedin": [
+        {"name": "Natalie Brooks", "title": "Software Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=51", "linkedin_url": "https://www.linkedin.com/company/linkedin/"},
+        {"name": "Kevin Zhang",    "title": "Engineering Manager",     "avatar_url": "https://i.pravatar.cc/48?img=33", "linkedin_url": "https://www.linkedin.com/company/linkedin/"},
+        {"name": "Aisha Mohammed", "title": "Product Manager",         "avatar_url": "https://i.pravatar.cc/48?img=7",  "linkedin_url": "https://www.linkedin.com/company/linkedin/"},
+        {"name": "Tyler Jenkins",  "title": "Data Scientist",          "avatar_url": "https://i.pravatar.cc/48?img=42", "linkedin_url": "https://www.linkedin.com/company/linkedin/"},
+        {"name": "Priya Kapoor",   "title": "Platform Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=16", "linkedin_url": "https://www.linkedin.com/company/linkedin/"},
+    ],
+    "jpmorgan": [
+        {"name": "William Scott",  "title": "Software Engineer",       "avatar_url": "https://i.pravatar.cc/48?img=23", "linkedin_url": "https://www.linkedin.com/company/jpmorgan-chase/"},
+        {"name": "Hannah Lee",     "title": "Data Scientist",          "avatar_url": "https://i.pravatar.cc/48?img=58", "linkedin_url": "https://www.linkedin.com/company/jpmorgan-chase/"},
+        {"name": "Omar Farooq",    "title": "Quantitative Analyst",    "avatar_url": "https://i.pravatar.cc/48?img=11", "linkedin_url": "https://www.linkedin.com/company/jpmorgan-chase/"},
+        {"name": "Claire Dubois",  "title": "Product Manager",         "avatar_url": "https://i.pravatar.cc/48?img=45", "linkedin_url": "https://www.linkedin.com/company/jpmorgan-chase/"},
+        {"name": "Raj Iyer",       "title": "Engineering Manager",     "avatar_url": "https://i.pravatar.cc/48?img=29", "linkedin_url": "https://www.linkedin.com/company/jpmorgan-chase/"},
+    ],
+}
+
+# Legal entity suffixes that LinkedIn does not index under
+_LEGAL_SUFFIXES = re.compile(
+    r"(?:"
+    # Suffixes that appear after a space/comma (e.g. "Amazon.com Services LLC")
+    r",?\s+(?:Inc\.?|LLC\.?|Ltd\.?|Corp\.?|Corporation|Limited"
+    r"|Services\s+LLC|Services\s+Inc\.?"
+    r"|Platforms?,?\s+Inc\.?|Technologies?,?\s+Inc\.?"
+    r"|Group,?\s+Inc\.?|Holdings?,?\s+Inc\.?"
+    r"|Co\.?|L\.P\.?|LP|PLC|GmbH|S\.A\.?)"
+    # .com can be attached directly (e.g. "Amazon.com" after prior stripping)
+    r"|\.com"
+    r")\s*$",
+    re.IGNORECASE,
+)
+
+
+def _construct_linkedin_company_url(name: str) -> str:
+    """Derive a LinkedIn company URL directly from the normalised company name.
+
+    LinkedIn slugs are the lowercased name with spaces/punctuation replaced by
+    hyphens, e.g.:
+        'Amazon'           → https://www.linkedin.com/company/amazon/
+        'Mastercard'       → https://www.linkedin.com/company/mastercard/
+        'Goldman Sachs'    → https://www.linkedin.com/company/goldman-sachs/
+        'Amazon Web Services' → https://www.linkedin.com/company/amazon-web-services/
+    """
+    slug = name.lower()
+    slug = re.sub(r"[^a-z0-9\s-]", "", slug)   # keep letters, digits, spaces, hyphens
+    slug = re.sub(r"[\s]+", "-", slug)           # spaces → hyphens
+    slug = slug.strip("-")
+    return f"https://www.linkedin.com/company/{slug}/"
+
+
+def _normalize_company_name(name: str) -> str:
+    """Strip common legal entity suffixes so Proxycurl can match the brand name.
+
+    Examples:
+        'Amazon.com Services LLC'  → 'Amazon'
+        'Meta Platforms, Inc.'     → 'Meta'
+        'Alphabet Inc.'            → 'Alphabet'
+        'X Corp.'                  → 'X'
+    """
+    # Iteratively remove suffixes until the name stabilises (handles stacked suffixes)
+    prev = None
+    result = name.strip()
+    while result != prev:
+        prev = result
+        result = _LEGAL_SUFFIXES.sub("", result).strip().rstrip(",").strip()
+    return result or name.strip()
+
 
 def fetch_linkedin_employees(company_name: str, company_url: Optional[str] = None) -> list:
-    """Fetch up to 5 employees for a company via Proxycurl (sync, cached).
+    """Return up to 5 hardcoded employees for well-known companies (sync, cached).
 
-    Returns an empty list if PROXYCURL_API_KEY is not set or the request fails,
-    so the frontend employee section is simply hidden.
+    Uses a local lookup table so no external API call is made.
+    Returns [] for unknown companies — the frontend section stays hidden gracefully.
     """
-    proxycurl_key = os.getenv("PROXYCURL_API_KEY")
-    if not proxycurl_key:
-        logger.warning("PROXYCURL_API_KEY not set – returning empty employee list")
-        return []
+    normalized_name = _normalize_company_name(company_name)
+    if normalized_name != company_name:
+        logger.info("Normalised company name: %r → %r", company_name, normalized_name)
 
-    cache_key = company_name.lower()
+    cache_key = normalized_name.lower()
     if cache_key in _employee_cache:
-        logger.info("Returning cached employees for %s", company_name)
         return _employee_cache[cache_key]
 
-    auth_header = {"Authorization": f"Bearer {proxycurl_key}"}
-
-    # Step 1: resolve the company's LinkedIn URL when not supplied
-    if not company_url:
-        try:
-            resp = requests.get(
-                "https://nubela.co/proxycurl/api/linkedin/company/resolve",
-                params={"company_name": company_name, "similarity_checks": "no"},
-                headers=auth_header,
-                timeout=10,
-            )
-            if resp.status_code != 200:
-                logger.warning("Could not resolve LinkedIn URL for %s: %s", company_name, resp.status_code)
-                return []
-            company_url = resp.json().get("url")
-        except Exception as exc:
-            logger.warning("Proxycurl resolve failed for %s: %s", company_name, exc)
-            return []
-
-    if not company_url:
-        return []
-
-    # Step 2: fetch the employee list
-    try:
-        resp = requests.get(
-            "https://nubela.co/proxycurl/api/linkedin/company/employees",
-            params={
-                "linkedin_company_profile_url": company_url,
-                "page_size": "5",
-            },
-            headers=auth_header,
-            timeout=15,
-        )
-        if resp.status_code != 200:
-            logger.warning("Failed to fetch employees for %s: %s", company_url, resp.status_code)
-            return []
-
-        employees = []
-        for emp in resp.json().get("employees", [])[:5]:
-            profile = emp.get("profile", {})
-            employees.append({
-                "name": profile.get("full_name") or emp.get("name", "Unknown"),
-                "title": profile.get("occupation") or profile.get("headline", ""),
-                "avatar_url": profile.get("profile_pic_url"),
-                "linkedin_url": emp.get("profile_url"),
-            })
-
-        _employee_cache[cache_key] = employees
-        return employees
-
-    except Exception as exc:
-        logger.warning("Proxycurl employee fetch failed for %s: %s", company_url, exc)
-        return []
+    employees = _HARDCODED_EMPLOYEES.get(cache_key, [])
+    _employee_cache[cache_key] = employees
+    if employees:
+        logger.info("Returning hardcoded employees for %r (%d profiles)", normalized_name, len(employees))
+    else:
+        logger.info("No hardcoded employees for %r – section will be hidden", normalized_name)
+    return employees
 
 
 async def process_resume_background(upload_id: str, tmp_path: str):
@@ -607,9 +733,8 @@ Thanks,
 def get_company_employees(request: EmployeeSearchRequest):
     """Return up to 5 employees at a company for the LinkedIn referral modal.
 
-    Uses a sync def route so FastAPI runs it in a thread pool, keeping the
-    blocking Proxycurl HTTP calls off the event loop.
-    Returns an empty list (not an error) when no API key is configured.
+    Uses a sync def route (FastAPI runs it in a thread pool automatically).
+    Returns an empty list (not an error) for unknown companies.
     """
     employees = fetch_linkedin_employees(request.company_name, request.company_linkedin_url)
     return {"success": True, "employees": employees}
