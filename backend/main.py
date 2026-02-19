@@ -29,6 +29,7 @@ from src.config import config
 from openai import OpenAI
 import tempfile
 import os
+import requests
 
 openai_client = OpenAI(api_key=config.openai_api_key)
 
@@ -68,6 +69,80 @@ resume_exporter = ResumeExporter()
 # Job processing queue to store results
 job_results = {}
 upload_results = {}
+
+# In-memory cache for employee lookups (keyed by lowercased company name)
+_employee_cache: Dict[str, list] = {}
+
+
+def fetch_linkedin_employees(company_name: str, company_url: Optional[str] = None) -> list:
+    """Fetch up to 5 employees for a company via Proxycurl (sync, cached).
+
+    Returns an empty list if PROXYCURL_API_KEY is not set or the request fails,
+    so the frontend employee section is simply hidden.
+    """
+    proxycurl_key = os.getenv("PROXYCURL_API_KEY")
+    if not proxycurl_key:
+        logger.warning("PROXYCURL_API_KEY not set – returning empty employee list")
+        return []
+
+    cache_key = company_name.lower()
+    if cache_key in _employee_cache:
+        logger.info("Returning cached employees for %s", company_name)
+        return _employee_cache[cache_key]
+
+    auth_header = {"Authorization": f"Bearer {proxycurl_key}"}
+
+    # Step 1: resolve the company's LinkedIn URL when not supplied
+    if not company_url:
+        try:
+            resp = requests.get(
+                "https://nubela.co/proxycurl/api/linkedin/company/resolve",
+                params={"company_name": company_name, "similarity_checks": "no"},
+                headers=auth_header,
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                logger.warning("Could not resolve LinkedIn URL for %s: %s", company_name, resp.status_code)
+                return []
+            company_url = resp.json().get("url")
+        except Exception as exc:
+            logger.warning("Proxycurl resolve failed for %s: %s", company_name, exc)
+            return []
+
+    if not company_url:
+        return []
+
+    # Step 2: fetch the employee list
+    try:
+        resp = requests.get(
+            "https://nubela.co/proxycurl/api/linkedin/company/employees",
+            params={
+                "linkedin_company_profile_url": company_url,
+                "page_size": "5",
+            },
+            headers=auth_header,
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            logger.warning("Failed to fetch employees for %s: %s", company_url, resp.status_code)
+            return []
+
+        employees = []
+        for emp in resp.json().get("employees", [])[:5]:
+            profile = emp.get("profile", {})
+            employees.append({
+                "name": profile.get("full_name") or emp.get("name", "Unknown"),
+                "title": profile.get("occupation") or profile.get("headline", ""),
+                "avatar_url": profile.get("profile_pic_url"),
+                "linkedin_url": emp.get("profile_url"),
+            })
+
+        _employee_cache[cache_key] = employees
+        return employees
+
+    except Exception as exc:
+        logger.warning("Proxycurl employee fetch failed for %s: %s", company_url, exc)
+        return []
 
 
 async def process_resume_background(upload_id: str, tmp_path: str):
@@ -203,6 +278,11 @@ async def process_job_background(job_id: str, request: Dict[str, Any]):
 # Pydantic models for requests
 class JDFetchRequest(BaseModel):
     url: str
+
+
+class EmployeeSearchRequest(BaseModel):
+    company_name: str
+    company_linkedin_url: Optional[str] = None
 
 
 class JobSearchRequest(BaseModel):
@@ -521,6 +601,18 @@ Thanks,
     except Exception as e:
         logger.error(f"Error generating LinkedIn message: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/linkedin/employees")
+def get_company_employees(request: EmployeeSearchRequest):
+    """Return up to 5 employees at a company for the LinkedIn referral modal.
+
+    Uses a sync def route so FastAPI runs it in a thread pool, keeping the
+    blocking Proxycurl HTTP calls off the event loop.
+    Returns an empty list (not an error) when no API key is configured.
+    """
+    employees = fetch_linkedin_employees(request.company_name, request.company_linkedin_url)
+    return {"success": True, "employees": employees}
 
 
 @app.post("/api/interview/prep-plan")

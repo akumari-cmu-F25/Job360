@@ -123,6 +123,15 @@ export const api = {
     return response.data
   },
 
+  // LinkedIn employee list
+  getCompanyEmployees: async (companyName: string, companyLinkedInUrl?: string) => {
+    const response = await client.post('/api/linkedin/employees', {
+      company_name: companyName,
+      company_linkedin_url: companyLinkedInUrl,
+    })
+    return response.data
+  },
+
   // Job description fetch (URL pre-fetch before queuing)
   fetchJD: async (url: string) => {
     const response = await client.post('/api/jd/fetch', { url })

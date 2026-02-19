@@ -3,6 +3,13 @@ import { Job, Profile } from '../types'
 import { api } from '../api/client'
 import './LinkedInReferral.css'
 
+interface Employee {
+  name: string
+  title: string
+  avatar_url: string | null
+  linkedin_url: string
+}
+
 interface LinkedInReferralProps {
   job: Job
   profile: Profile
@@ -15,10 +22,23 @@ export default function LinkedInReferral({ job, profile, onClose }: LinkedInRefe
   const [tone, setTone] = useState<'professional' | 'friendly' | 'concise'>('professional')
   const [copied, setCopied] = useState(false)
   const [customRequirements, setCustomRequirements] = useState<string>('')
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [employeesLoading, setEmployeesLoading] = useState(false)
 
   useEffect(() => {
     generateMessage()
   }, [tone])
+
+  useEffect(() => {
+    if (!job.company) return
+    setEmployeesLoading(true)
+    api.getCompanyEmployees(job.company)
+      .then((result) => {
+        if (result.success) setEmployees(result.employees)
+      })
+      .catch(() => {/* silently hide section on error */})
+      .finally(() => setEmployeesLoading(false))
+  }, [job.company])
 
   const generateMessage = async () => {
     setLoading(true)
@@ -146,6 +166,38 @@ ${profile.name || 'Your Name'}`
             {copied ? 'Copied!' : 'Copy Message'}
           </button>
         </div>
+
+        {(employeesLoading || employees.length > 0) && (
+          <div className="employee-section">
+            <div className="employee-section-title">People at {job.company}</div>
+            {employeesLoading ? (
+              <div className="employee-loading">Loading...</div>
+            ) : (
+              <div className="employee-list">
+                {employees.map((emp, i) => (
+                  <a
+                    key={i}
+                    href={emp.linkedin_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="employee-card"
+                    title={`${emp.name} – ${emp.title}`}
+                  >
+                    {emp.avatar_url ? (
+                      <img src={emp.avatar_url} alt={emp.name} className="employee-avatar" />
+                    ) : (
+                      <div className="employee-avatar-placeholder">
+                        {emp.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="employee-name">{emp.name.split(' ')[0]}</div>
+                    <div className="employee-title">{emp.title}</div>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
