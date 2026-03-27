@@ -79,6 +79,8 @@ Job360/
 └── README.md
 ```
 
+Presentation for better understanding : https://docs.google.com/presentation/d/13KGLCFQF0km_dxheK5sTAyyJ8gnFg43Jw_7t8JtdkWY/edit?usp=sharing
+
 ## API Documentation
 
 Once the backend is running, visit:
